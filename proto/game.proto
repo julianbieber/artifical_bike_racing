@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package game;
+
+service MainService {
+  rpc health(Empty) returns (Empty); 
+  rpc getState(Empty) returns (Empty);
+  rpc input(Empty) returns (Empty);
+}
+
+message Empty {}
