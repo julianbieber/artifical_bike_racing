@@ -11,7 +11,9 @@ use tonic::{transport::Server, Request, Response, Status};
 
 use self::game::main_service_server::MainServiceServer;
 use self::game::{main_service_server::MainService, Empty};
+
 pub mod game {
+    #![allow(clippy::all)]
     tonic::include_proto!("game");
     pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
         tonic::include_file_descriptor_set!("game_descriptor");
@@ -24,11 +26,12 @@ pub struct NextFrame {}
 pub fn start_server(
     frame_receiver: Receiver<FrameState>,
     next_frame_sender: Sender<NextFrame>,
+    port: i32,
 ) -> JoinHandle<()> {
-    std::thread::spawn(|| {
+    std::thread::spawn(move || {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            let addr = "[::1]:50051".parse().unwrap();
+            let addr = format!("[::1]:{port}").parse().unwrap();
             let game_server = GameServer {
                 frame_receiver: Mutex::new(frame_receiver),
                 next_frame_sender,
@@ -57,18 +60,18 @@ pub struct GameServer {
 
 #[tonic::async_trait]
 impl MainService for GameServer {
-    async fn health(&self, r: Request<Empty>) -> Result<Response<Empty>, Status> {
+    async fn health(&self, _r: Request<Empty>) -> Result<Response<Empty>, Status> {
         Ok(Response::new(Empty {}))
     }
-    async fn get_state(&self, r: Request<Empty>) -> Result<Response<Empty>, Status> {
+    async fn get_state(&self, _r: Request<Empty>) -> Result<Response<Empty>, Status> {
         let mut receievr = self.frame_receiver.lock().await;
-        if let Some(state) = receievr.recv().await {
+        if let Some(_state) = receievr.recv().await {
             Ok(Response::new(Empty {}))
         } else {
             Err(Status::not_found("no new game state available"))
         }
     }
-    async fn input(&self, r: Request<Empty>) -> Result<Response<Empty>, Status> {
+    async fn input(&self, _r: Request<Empty>) -> Result<Response<Empty>, Status> {
         self.next_frame_sender
             .send(NextFrame {})
             .await

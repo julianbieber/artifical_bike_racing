@@ -1,19 +1,23 @@
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
+use clap::Parser;
 use server::{start_server, NextFrame};
-use tokio::{
-    runtime::Runtime,
-    sync::mpsc::{Receiver, Sender},
-};
+use tokio::{runtime::Runtime, sync::mpsc::Receiver};
+#[derive(Parser, Copy, Clone)]
+struct Opt {
+    #[arg(long)]
+    port: i32,
+}
 
 mod server;
 
 fn main() {
+    let opt = Opt::parse();
     let runtime = Runtime::new().unwrap();
     let (frame_sender, frame_reciever) = tokio::sync::mpsc::channel(1);
     let (next_sender, next_reciever) = tokio::sync::mpsc::channel(1);
 
-    let t = start_server(frame_reciever, next_sender);
+    let t = start_server(frame_reciever, next_sender, opt.port);
     App::new()
         .insert_resource(next_reciever)
         .insert_resource(frame_sender)
