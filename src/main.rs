@@ -3,6 +3,7 @@ use bevy_rapier3d::prelude::*;
 use clap::Parser;
 use server::{start_server, NextFrame};
 use tokio::{runtime::Runtime, sync::mpsc::Receiver};
+use world::WorldPlugin;
 #[derive(Parser, Copy, Clone)]
 struct Opt {
     #[arg(long)]
@@ -10,6 +11,8 @@ struct Opt {
 }
 
 mod server;
+mod texture;
+mod world;
 
 fn main() {
     let opt = Opt::parse();
@@ -25,6 +28,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
+        .add_plugin(WorldPlugin {})
         .add_startup_system(setup_graphics)
         .add_startup_system(setup_physics)
         .add_system(print_ball_altitude)
@@ -35,7 +39,7 @@ fn main() {
 fn setup_graphics(mut commands: Commands) {
     // Add a camera so we can see the debug-render.
     commands.spawn_bundle(Camera3dBundle {
-        transform: Transform::from_xyz(-3.0, 3.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(-3.0, 3.0, 20.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..Default::default()
     });
 }

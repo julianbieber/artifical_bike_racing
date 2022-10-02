@@ -31,6 +31,7 @@ pub fn start_server(
     std::thread::spawn(move || {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
+            next_frame_sender.send(NextFrame {}).await.unwrap();
             let addr = format!("[::1]:{port}").parse().unwrap();
             let game_server = GameServer {
                 frame_receiver: Mutex::new(frame_receiver),
