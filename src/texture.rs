@@ -1,38 +1,93 @@
-use std::path::PathBuf;
+use std::{
+    cmp::Eq,
+    hash::Hash,
+    path::{Path, PathBuf},
+};
 
 use bevy::{
     prelude::*,
     render::render_resource::{TextureDimension, TextureFormat},
     utils::HashMap,
 };
-use image::{ImageBuffer, RgbaImage};
+use image::{imageops::FilterType, ImageBuffer, RgbaImage};
 
 pub struct Atlas<A> {
-    material: StandardMaterial,
-    to_uv: HashMap<A, (f32, f32)>,
+    pub material: StandardMaterial,
+    pub to_uv: HashMap<A, UvCoords>,
+}
+
+pub struct UvCoords {
+    pub top: f32,
+    pub bottom: f32,
+    pub left: f32,
+    pub right: f32,
 }
 
 pub struct PbrImages {
-    color: PathBuf,
-    normal: PathBuf,
-    roughness: PathBuf,
-    ambient: PathBuf,
+    pub color: PathBuf,
+    pub normal: PathBuf,
+    pub roughness: PathBuf,
+    pub ambient: PathBuf,
 }
 
-pub fn create_texture<A>(images: &[(A, PbrImages)], image_server: &mut Assets<Image>) -> Atlas<A> {
-    let color: RgbaImage = ImageBuffer::new(1024 * images.len() as u32, 1024);
-    let normal: RgbaImage = ImageBuffer::new(1024 * images.len() as u32, 1024);
-    let roughness: RgbaImage = ImageBuffer::new(1024 * images.len() as u32, 1024);
-    let ambient: RgbaImage = ImageBuffer::new(1024 * images.len() as u32, 1024);
-    let uvs = HashMap::with_capacity(images.len());
-    for (i, image) in images.iter().enumerate() {}
+pub fn create_texture<A>(images: &[(A, PbrImages)], image_server: &mut Assets<Image>) -> Atlas<A>
+where
+    A: Eq + Hash + Copy + Clone,
+{
+    let mut color: RgbaImage = ImageBuffer::new(1024 * images.len() as u32, 1024);
+    let mut normal: RgbaImage = ImageBuffer::new(1024 * images.len() as u32, 1024);
+    let mut roughness: RgbaImage = ImageBuffer::new(1024 * images.len() as u32, 1024);
+    let mut ambient: RgbaImage = ImageBuffer::new(1024 * images.len() as u32, 1024);
+    let mut uvs = HashMap::with_capacity(images.len());
+    for (i, (marker, pbr_image)) in images.iter().enumerate() {
+        let current = read_image(&pbr_image.color);
+        set_section(&current, &mut color, i as u32 * 1024);
+        let current = read_image(&pbr_image.normal);
+        set_section(&current, &mut normal, i as u32 * 1024);
+        let current = read_image(&pbr_image.roughness);
+        set_section(&current, &mut roughness, i as u32 * 1024);
+        let current = read_image(&pbr_image.ambient);
+        set_section(&current, &mut ambient, i as u32 * 1024);
+
+        uvs.insert(
+            *marker,
+            UvCoords {
+                top: 1.0,
+                bottom: 0.0,
+                left: i as f32 / (images.len() as f32),
+                right: (i + 1) as f32 / (images.len() as f32),
+            },
+        );
+    }
 
     Atlas {
         material: StandardMaterial {
             base_color_texture: Some(image_server.add(to_bevy_image(color))),
+            normal_map_texture: Some(image_server.add(to_bevy_image(normal))),
+            metallic_roughness_texture: Some(image_server.add(to_bevy_image(roughness))),
+            occlusion_texture: Some(image_server.add(to_bevy_image(ambient))),
             ..Default::default()
         },
         to_uv: uvs,
+    }
+}
+
+fn read_image(path: &Path) -> RgbaImage {
+    image::io::Reader::open(path)
+        .unwrap()
+        .with_guessed_format()
+        .unwrap()
+        .decode()
+        .unwrap()
+        .resize_exact(1024, 1024, FilterType::Gaussian)
+        .into_rgba8()
+}
+
+fn set_section(src: &RgbaImage, dst: &mut RgbaImage, width_offset: u32) {
+    for x in 0..1024 {
+        for y in 0..1024 {
+            dst.put_pixel(x + width_offset, y, src.get_pixel(x, y).clone());
+        }
     }
 }
 

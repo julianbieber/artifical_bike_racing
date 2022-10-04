@@ -2,6 +2,8 @@ use bevy::{
     prelude::*,
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
+
+use crate::texture::{create_texture, PbrImages};
 pub struct WorldPlugin {}
 
 impl Plugin for WorldPlugin {
@@ -10,13 +12,36 @@ impl Plugin for WorldPlugin {
     }
 }
 
-fn setup_world(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+fn setup_world(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
+) {
     let mesh = generate_world(30, (-10.0, -10.0), 20.0);
     let mesh = meshes.add(mesh);
+    let atlas = create_texture(
+        &[(
+            TextureSections::Grass,
+            PbrImages {
+                color: "assets/grass/color.png".into(),
+                normal: "assets/grass/normal.png".into(),
+                roughness: "assets/grass/roughness.png".into(),
+                ambient: "assets/grass/ambient.png".into(),
+            },
+        )],
+        &mut images,
+    );
     commands.spawn_bundle(PbrBundle {
         mesh,
+        material: materials.add(atlas.material),
         ..Default::default()
     });
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum TextureSections {
+    Grass,
 }
 
 fn generate_world(subdivisions: usize, offset: (f32, f32), size: f32) -> Mesh {
