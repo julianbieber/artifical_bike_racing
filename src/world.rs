@@ -22,6 +22,7 @@ fn setup_world(
     let mesh = meshes.add(mesh);
     let atlas = create_texture(
         &[(
+            // https://ambientcg.com/view?id=Grass004
             TextureSections::Grass,
             PbrImages {
                 color: "assets/grass/color.png".into(),

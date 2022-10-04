@@ -86,7 +86,7 @@ fn read_image(path: &Path) -> RgbaImage {
 fn set_section(src: &RgbaImage, dst: &mut RgbaImage, width_offset: u32) {
     for x in 0..1024 {
         for y in 0..1024 {
-            dst.put_pixel(x + width_offset, y, src.get_pixel(x, y).clone());
+            dst.put_pixel(x + width_offset, y, *src.get_pixel(x, y));
         }
     }
 }
