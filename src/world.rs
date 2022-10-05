@@ -2,8 +2,9 @@ use bevy::{
     prelude::*,
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
+use noise::{NoiseFn, Simplex};
 
-use crate::texture::{create_texture, PbrImages};
+use crate::texture::{create_texture, Atlas, PbrImages};
 pub struct WorldPlugin {}
 
 impl Plugin for WorldPlugin {
@@ -18,8 +19,6 @@ fn setup_world(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    let mesh = generate_world(30, (-10.0, -10.0), 20.0);
-    let mesh = meshes.add(mesh);
     let atlas = create_texture(
         &[(
             // https://ambientcg.com/view?id=Grass004
@@ -33,6 +32,8 @@ fn setup_world(
         )],
         &mut images,
     );
+    let mesh = generate_world(&atlas, 30, (-10.0, -10.0), 20.0);
+    let mesh = meshes.add(mesh);
     commands.spawn_bundle(PbrBundle {
         mesh,
         material: materials.add(atlas.material),
@@ -45,51 +46,126 @@ enum TextureSections {
     Grass,
 }
 
-fn generate_world(subdivisions: usize, offset: (f32, f32), size: f32) -> Mesh {
-    let vertices_per_length = subdivisions + 1;
-    let mut vertices = Vec::with_capacity(vertices_per_length * vertices_per_length);
-    let f_sub = subdivisions as f32;
-    let step = size / f_sub;
-    for z in 0..vertices_per_length {
-        let f_z = z as f32 * step + offset.0;
-        for x in 0..vertices_per_length {
-            let f_x = x as f32 * step + offset.1;
-            vertices.push(([f_x, 0.0, f_z], [0.0, 1.0, 0.0], [0.0, 0.0]));
-        }
+fn generate_world(
+    atlas: &Atlas<TextureSections>,
+    subdivisions: usize,
+    offset: (f32, f32),
+    size: f32,
+) -> Mesh {
+    let quads = WorldQuads::new(subdivisions);
+    quads.to_mesh(atlas)
+}
+
+struct WorldQuads {
+    quads: Vec<Vec<Quad>>,
+}
+
+impl WorldQuads {
+    fn new(size: usize) -> WorldQuads {
+        let noise = Simplex::new(0);
+        let quads = (0..size)
+            .map(|x| {
+                (0..size)
+                    .map(|z| {
+                        let height = noise.get([scale(x), scale(z)]) as f32;
+                        Quad {
+                            height,
+                            texture: TextureSections::Grass,
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        WorldQuads { quads }
     }
-    // let vertices = &[
-    //     // Top
-    //     ([sp.min_x, sp.min_y, sp.max_z], [0., 0., 1.0], [0., 0.]),
-    //     ([sp.max_x, sp.min_y, sp.max_z], [0., 0., 1.0], [1.0, 0.]),
-    //     ([sp.max_x, sp.max_y, sp.max_z], [0., 0., 1.0], [1.0, 1.0]),
-    //     ([sp.min_x, sp.max_y, sp.max_z], [0., 0., 1.0], [0., 1.0]),
-    // ];
 
-    let positions: Vec<_> = vertices.iter().map(|(p, _, _)| *p).collect();
-    dbg!(&positions);
-    let normals: Vec<_> = vertices.iter().map(|(_, n, _)| *n).collect();
-    let uvs: Vec<_> = vertices.iter().map(|(_, _, uv)| *uv).collect();
+    fn to_mesh(&self, atlas: &Atlas<TextureSections>) -> Mesh {
+        let mut positions: Vec<[f32; 3]> =
+            Vec::with_capacity(self.quads.len() * self.quads.len() * 4);
+        let mut normals: Vec<[f32; 3]> =
+            Vec::with_capacity(self.quads.len() * self.quads.len() * 4);
+        let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(self.quads.len() * self.quads.len() * 4);
+        let mut indices = Vec::with_capacity(self.quads.len() * self.quads.len() * 6);
+        let mut current_index = 0;
 
-    let mut indices: Vec<u32> =
-        Vec::with_capacity((vertices_per_length) * (vertices_per_length) * 6);
-    for x in 0..subdivisions as u32 {
-        for y in 0..subdivisions as u32 {
-            indices.extend_from_slice(&[
-                x,
-                x + (y + 1) * vertices_per_length as u32,
-                x + 1,
-                x + (y + 1) * vertices_per_length as u32,
-                x + (y + 1) * vertices_per_length as u32 + 1,
-                x + 1,
-            ]);
+        for (x, quads) in self.quads.iter().enumerate() {
+            for (z, quad) in quads.iter().enumerate() {
+                let x_p1 = self.get(x + 1, z).map(|q| q.height);
+                let x_m1 = self.get(x - 1, z).map(|q| q.height);
+                let z_p1 = self.get(x, z + 1).map(|q| q.height);
+                let z_m1 = self.get(x, z - 1).map(|q| q.height);
+                positions.extend(quad.to_positions(
+                    x as f32 - 10.0,
+                    z as f32 - 10.0,
+                    x_p1,
+                    x_m1,
+                    z_p1,
+                    z_m1,
+                ));
+                normals.extend(quad.to_normals());
+                uvs.extend(quad.to_uvs(atlas));
+                indices.extend([
+                    current_index,
+                    current_index + 2,
+                    current_index + 1,
+                    current_index + 1,
+                    current_index + 2,
+                    current_index + 3,
+                ]);
+                current_index += 4;
+            }
         }
-    }
-    let indices = Indices::U32(dbg!(indices));
 
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    mesh.set_indices(Some(indices));
-    mesh
+        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+        mesh.set_indices(Some(Indices::U32(indices)));
+        mesh
+    }
+
+    fn get(&self, x: usize, z: usize) -> Option<&Quad> {
+        self.quads.get(x).and_then(|q| q.get(z))
+    }
+}
+
+fn scale(v: usize) -> f64 {
+    (v as f64) / 1000.0
+}
+
+struct Quad {
+    height: f32,
+    texture: TextureSections,
+}
+impl Quad {
+    fn to_positions(
+        &self,
+        x: f32,
+        z: f32,
+        height_x_p1: Option<f32>,
+        height_x_m1: Option<f32>,
+        height_y_p1: Option<f32>,
+        height_y_m1: Option<f32>,
+    ) -> [[f32; 3]; 4] {
+        [
+            [x + 0.0, 0.0, z + 0.0],
+            [x + 1.0, 0.0, z + 1.0],
+            [x + 0.0, 0.0, z + 0.0],
+            [x + 1.0, 0.0, z + 1.0],
+        ]
+    }
+
+    fn to_normals(&self) -> [[f32; 3]; 4] {
+        [
+            [0.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ]
+    }
+
+    fn to_uvs(&self, atlas: &Atlas<TextureSections>) -> [[f32; 2]; 4] {
+        [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
+    }
 }
