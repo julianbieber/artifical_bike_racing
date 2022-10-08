@@ -1,4 +1,7 @@
-use bevy::prelude::{shape::Icosphere, *};
+use bevy::{
+    prelude::{shape::Icosphere, *},
+    window::{PresentMode, WindowMode},
+};
 use bevy_rapier3d::prelude::*;
 use clap::Parser;
 use server::{start_server, NextFrame};
@@ -22,6 +25,11 @@ fn main() {
 
     let t = start_server(frame_reciever, next_sender, opt.port);
     App::new()
+        .insert_resource(WindowDescriptor {
+            mode: WindowMode::Fullscreen,
+            present_mode: PresentMode::AutoVsync,
+            ..default()
+        })
         .insert_resource(next_reciever)
         .insert_resource(frame_sender)
         .insert_resource(runtime)
@@ -39,7 +47,7 @@ fn main() {
 fn setup_graphics(mut commands: Commands) {
     // Add a camera so we can see the debug-render.
     commands.spawn_bundle(Camera3dBundle {
-        transform: Transform::from_xyz(-3.0, 3.0, 20.0).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(-3.0, 20.0, 40.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..Default::default()
     });
 }
@@ -75,10 +83,10 @@ fn print_ball_altitude(
     runtime: Res<Runtime>,
     mut next_frame_receiver: ResMut<Receiver<NextFrame>>,
 ) {
-    runtime.block_on(async {
-        next_frame_receiver.recv().await.unwrap();
-    });
-    for transform in positions.iter() {
-        println!("Ball altitude: {}", transform.translation.y);
-    }
+    // runtime.block_on(async {
+    //     next_frame_receiver.recv().await.unwrap();
+    // });
+    // for transform in positions.iter() {
+    //     println!("Ball altitude: {}", transform.translation.y);
+    // }
 }

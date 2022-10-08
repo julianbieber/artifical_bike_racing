@@ -35,7 +35,7 @@ fn setup_world(
         )],
         &mut images,
     );
-    let (mesh, collider) = generate_world(&atlas, 230, 0.3);
+    let (mesh, collider) = generate_world(&atlas, 1430, 0.1);
     let mesh = meshes.add(mesh);
     commands
         .spawn_bundle(PbrBundle {
@@ -44,15 +44,61 @@ fn setup_world(
             ..Default::default()
         })
         .insert(collider);
-    commands.spawn_bundle(PointLightBundle {
-        point_light: PointLight {
-            intensity: 1500.0,
-            shadows_enabled: true,
+    // commands
+    //     .spawn_bundle(PointLightBundle {
+    //         point_light: PointLight {
+    //             intensity: 1500.0,
+    //             shadows_enabled: true,
+    //             ..default()
+    //         },
+    //         transform: Transform::from_xyz(0.0, 8.0, 0.0),
+    //         ..default()
+    //     })
+    //     .insert(RigidBody::Dynamic)
+    //     .insert(Collider::ball(2.5))
+    //     .insert(Restitution::coefficient(0.7));
+    commands
+        .spawn_bundle(PointLightBundle {
+            point_light: PointLight {
+                intensity: 1500.0,
+                shadows_enabled: true,
+                color: Color::ALICE_BLUE,
+                ..default()
+            },
+            transform: Transform::from_xyz(2.0, 22.0, 0.0),
             ..default()
-        },
-        transform: Transform::from_xyz(0.0, 8.0, 0.0),
-        ..default()
-    });
+        })
+        .insert(RigidBody::Dynamic)
+        .insert(Collider::ball(4.5))
+        .insert(Restitution::coefficient(1.9));
+    commands
+        .spawn_bundle(PointLightBundle {
+            point_light: PointLight {
+                intensity: 1500.0,
+                shadows_enabled: true,
+                color: Color::CRIMSON,
+                ..default()
+            },
+            transform: Transform::from_xyz(-4.0, 8.0, 0.0),
+            ..default()
+        })
+        .insert(RigidBody::Dynamic)
+        .insert(Collider::ball(2.5))
+        .insert(Restitution::coefficient(0.8));
+    commands
+        .spawn_bundle(PointLightBundle {
+            point_light: PointLight {
+                intensity: 1500.0,
+                shadows_enabled: true,
+                color: Color::GOLD,
+                ..default()
+            },
+            transform: Transform::from_xyz(4.0, 8.0, 0.0),
+            ..default()
+        })
+        .insert(RigidBody::Dynamic)
+        .insert(Collider::ball(2.5))
+        .insert(Restitution::coefficient(0.7));
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -74,14 +120,42 @@ struct WorldQuads {
     size: f32,
 }
 
+struct WorldNoise {
+    high_frequency: Simplex,
+    low_frequency: Simplex,
+}
+impl WorldNoise {
+    fn new() -> Self {
+        Self {
+            high_frequency: Simplex::new(0),
+            low_frequency: Simplex::new(1),
+        }
+    }
+
+    fn get_height(&self, x: usize, z: usize) -> f32 {
+        let high_freqnecy_sample_position = self.to_high_sample(x, z);
+        let low_frequency_sample_position = self.to_low_sample(x, z);
+        (self.high_frequency.get(high_freqnecy_sample_position) * 0.2
+            + self.low_frequency.get(low_frequency_sample_position) * 1.5) as f32
+    }
+
+    fn to_high_sample(&self, x: usize, z: usize) -> [f64; 2] {
+        [x as f64 / 7.0, z as f64 / 7.0]
+    }
+
+    fn to_low_sample(&self, x: usize, z: usize) -> [f64; 2] {
+        [x as f64 / 50.0, z as f64 / 50.0]
+    }
+}
+
 impl WorldQuads {
     fn new(size: usize, s: f32) -> WorldQuads {
-        let noise = Simplex::new(0);
+        let noise = WorldNoise::new();
         let quads = (0..size)
             .map(|x| {
                 (0..size)
                     .map(|z| {
-                        let height = noise.get([scale(x), scale(z)]) as f32;
+                        let height = noise.get_height(x, z);
                         Quad {
                             height,
                             texture: TextureSections::Grass,
@@ -155,10 +229,6 @@ fn surrounding_indices(x: usize, z: usize) -> [[(usize, usize); 3]; 3] {
         [(x - 1, z), (x, z), (x + 1, z)],
         [(x - 1, z + 1), (x, z + 1), (x + 1, z + 1)],
     ]
-}
-
-fn scale(v: usize) -> f64 {
-    (v as f64) / 10.0
 }
 
 struct Quad {
