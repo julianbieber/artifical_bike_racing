@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::prelude::{shape::Icosphere, *};
 use bevy_rapier3d::prelude::*;
 use clap::Parser;
 use server::{start_server, NextFrame};
@@ -27,7 +27,7 @@ fn main() {
         .insert_resource(runtime)
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugin(RapierDebugRenderPlugin::default())
+        // .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(WorldPlugin {})
         .add_startup_system(setup_graphics)
         .add_startup_system(setup_physics)
@@ -44,20 +44,30 @@ fn setup_graphics(mut commands: Commands) {
     });
 }
 
-fn setup_physics(mut commands: Commands) {
-    /* Create the ground. */
-    commands
-        .spawn()
-        .insert(Collider::cuboid(100.0, 0.1, 100.0))
-        .insert_bundle(TransformBundle::from(Transform::from_xyz(0.0, -2.0, 0.0)));
-
+fn setup_physics(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     /* Create the bouncing ball. */
     commands
-        .spawn()
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(
+                Icosphere {
+                    radius: 0.5,
+                    subdivisions: 5,
+                }
+                .into(),
+            ),
+            material: materials.add(StandardMaterial {
+                ..Default::default()
+            }),
+            transform: Transform::from_xyz(0.0, 4.0, 0.0),
+            ..Default::default()
+        })
         .insert(RigidBody::Dynamic)
         .insert(Collider::ball(0.5))
-        .insert(Restitution::coefficient(0.7))
-        .insert_bundle(TransformBundle::from(Transform::from_xyz(0.0, 4.0, 0.0)));
+        .insert(Restitution::coefficient(0.7));
 }
 
 fn print_ball_altitude(

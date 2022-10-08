@@ -5,6 +5,9 @@ use bevy::{
 use noise::{NoiseFn, Simplex};
 
 use crate::texture::{create_texture, Atlas, PbrImages};
+use bevy_rapier3d::prelude::*;
+use statrs::statistics::Statistics;
+
 pub struct WorldPlugin {}
 
 impl Plugin for WorldPlugin {
@@ -32,12 +35,23 @@ fn setup_world(
         )],
         &mut images,
     );
-    let mesh = generate_world(&atlas, 30, (-10.0, -10.0), 20.0);
+    let (mesh, collider) = generate_world(&atlas, 230, 0.3);
     let mesh = meshes.add(mesh);
-    commands.spawn_bundle(PbrBundle {
-        mesh,
-        material: materials.add(atlas.material),
-        ..Default::default()
+    commands
+        .spawn_bundle(PbrBundle {
+            mesh,
+            material: materials.add(atlas.material),
+            ..Default::default()
+        })
+        .insert(collider);
+    commands.spawn_bundle(PointLightBundle {
+        point_light: PointLight {
+            intensity: 1500.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_xyz(0.0, 8.0, 0.0),
+        ..default()
     });
 }
 
@@ -49,19 +63,19 @@ enum TextureSections {
 fn generate_world(
     atlas: &Atlas<TextureSections>,
     subdivisions: usize,
-    offset: (f32, f32),
     size: f32,
-) -> Mesh {
-    let quads = WorldQuads::new(subdivisions);
+) -> (Mesh, Collider) {
+    let quads = WorldQuads::new(subdivisions, size);
     quads.to_mesh(atlas)
 }
 
 struct WorldQuads {
     quads: Vec<Vec<Quad>>,
+    size: f32,
 }
 
 impl WorldQuads {
-    fn new(size: usize) -> WorldQuads {
+    fn new(size: usize, s: f32) -> WorldQuads {
         let noise = Simplex::new(0);
         let quads = (0..size)
             .map(|x| {
@@ -71,16 +85,20 @@ impl WorldQuads {
                         Quad {
                             height,
                             texture: TextureSections::Grass,
+                            scale: s,
                         }
                     })
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
 
-        WorldQuads { quads }
+        WorldQuads {
+            quads,
+            size: size as f32,
+        }
     }
 
-    fn to_mesh(&self, atlas: &Atlas<TextureSections>) -> Mesh {
+    fn to_mesh(&self, atlas: &Atlas<TextureSections>) -> (Mesh, Collider) {
         let mut positions: Vec<[f32; 3]> =
             Vec::with_capacity(self.quads.len() * self.quads.len() * 4);
         let mut normals: Vec<[f32; 3]> =
@@ -91,17 +109,12 @@ impl WorldQuads {
 
         for (x, quads) in self.quads.iter().enumerate() {
             for (z, quad) in quads.iter().enumerate() {
-                let x_p1 = self.get(x + 1, z).map(|q| q.height);
-                let x_m1 = self.get(x - 1, z).map(|q| q.height);
-                let z_p1 = self.get(x, z + 1).map(|q| q.height);
-                let z_m1 = self.get(x, z - 1).map(|q| q.height);
+                let s = surrounding_indices(x, z)
+                    .map(|row| row.map(|(x1, z1)| self.get(x1, z1).map(|q| q.height)));
                 positions.extend(quad.to_positions(
-                    x as f32 - 10.0,
-                    z as f32 - 10.0,
-                    x_p1,
-                    x_m1,
-                    z_p1,
-                    z_m1,
+                    x as f32 - self.size / 2.0,
+                    z as f32 - self.size / 2.0,
+                    &s,
                 ));
                 normals.extend(quad.to_normals());
                 uvs.extend(quad.to_uvs(atlas));
@@ -109,50 +122,105 @@ impl WorldQuads {
                     current_index,
                     current_index + 2,
                     current_index + 1,
-                    current_index + 1,
                     current_index + 2,
                     current_index + 3,
+                    current_index + 1,
                 ]);
                 current_index += 4;
             }
         }
 
+        let collider = Collider::trimesh(
+            positions
+                .iter()
+                .map(|p| Vec3::new(p[0], p[1], p[2]))
+                .collect(),
+            indices.chunks(3).map(|c| [c[0], c[1], c[2]]).collect(),
+        );
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
         mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
         mesh.set_indices(Some(Indices::U32(indices)));
-        mesh
+        (mesh, collider)
     }
 
     fn get(&self, x: usize, z: usize) -> Option<&Quad> {
         self.quads.get(x).and_then(|q| q.get(z))
     }
 }
+fn surrounding_indices(x: usize, z: usize) -> [[(usize, usize); 3]; 3] {
+    [
+        [(x - 1, z - 1), (x, z - 1), (x + 1, z - 1)],
+        [(x - 1, z), (x, z), (x + 1, z)],
+        [(x - 1, z + 1), (x, z + 1), (x + 1, z + 1)],
+    ]
+}
 
 fn scale(v: usize) -> f64 {
-    (v as f64) / 1000.0
+    (v as f64) / 10.0
 }
 
 struct Quad {
     height: f32,
     texture: TextureSections,
+    scale: f32,
 }
 impl Quad {
-    fn to_positions(
-        &self,
-        x: f32,
-        z: f32,
-        height_x_p1: Option<f32>,
-        height_x_m1: Option<f32>,
-        height_y_p1: Option<f32>,
-        height_y_m1: Option<f32>,
-    ) -> [[f32; 3]; 4] {
+    fn to_positions(&self, x: f32, z: f32, surrounding: &[[Option<f32>; 3]; 3]) -> [[f32; 3]; 4] {
         [
-            [x + 0.0, 0.0, z + 0.0],
-            [x + 1.0, 0.0, z + 1.0],
-            [x + 0.0, 0.0, z + 0.0],
-            [x + 1.0, 0.0, z + 1.0],
+            [
+                self.scale * (x + 0.0),
+                [
+                    surrounding[0][0],
+                    surrounding[0][1],
+                    surrounding[1][0],
+                    surrounding[1][1],
+                ]
+                .into_iter()
+                .map(|v| v.unwrap_or(self.height) as f64)
+                .mean() as f32,
+                self.scale * (z + 0.0),
+            ],
+            [
+                self.scale * (x + 1.0),
+                [
+                    surrounding[0][1],
+                    surrounding[0][2],
+                    surrounding[1][1],
+                    surrounding[1][2],
+                ]
+                .into_iter()
+                .map(|v| v.unwrap_or(self.height) as f64)
+                .mean() as f32,
+                self.scale * (z + 0.0),
+            ],
+            [
+                self.scale * (x + 0.0),
+                [
+                    surrounding[1][0],
+                    surrounding[1][1],
+                    surrounding[2][0],
+                    surrounding[2][1],
+                ]
+                .into_iter()
+                .map(|v| v.unwrap_or(self.height) as f64)
+                .mean() as f32,
+                self.scale * (z + 1.0),
+            ],
+            [
+                self.scale * (x + 1.0),
+                [
+                    surrounding[1][1],
+                    surrounding[1][2],
+                    surrounding[2][1],
+                    surrounding[2][2],
+                ]
+                .into_iter()
+                .map(|v| v.unwrap_or(self.height) as f64)
+                .mean() as f32,
+                self.scale * (z + 1.0),
+            ],
         ]
     }
 
@@ -166,6 +234,12 @@ impl Quad {
     }
 
     fn to_uvs(&self, atlas: &Atlas<TextureSections>) -> [[f32; 2]; 4] {
-        [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
+        let coords = atlas.to_uv.get(&self.texture).unwrap();
+        [
+            [coords.left, coords.bottom],
+            [coords.right, coords.bottom],
+            [coords.left, coords.top],
+            [coords.right, coords.top],
+        ]
     }
 }
