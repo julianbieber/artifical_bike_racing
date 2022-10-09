@@ -2,9 +2,11 @@ use bevy::{
     prelude::*,
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
-use noise::{NoiseFn, Simplex};
 
-use crate::texture::{create_texture, Atlas, PbrImages};
+use crate::{
+    noise::WorldNoise,
+    texture::{create_texture, Atlas, PbrImages},
+};
 use bevy_rapier3d::prelude::*;
 use statrs::statistics::Statistics;
 
@@ -35,7 +37,7 @@ fn setup_world(
         )],
         &mut images,
     );
-    let (mesh, collider) = generate_world(&atlas, 1430, 0.1);
+    let (mesh, collider) = generate_world(&atlas, 430, 1.0);
     let mesh = meshes.add(mesh);
     commands
         .spawn_bundle(PbrBundle {
@@ -44,23 +46,24 @@ fn setup_world(
             ..Default::default()
         })
         .insert(collider);
-    // commands
-    //     .spawn_bundle(PointLightBundle {
-    //         point_light: PointLight {
-    //             intensity: 1500.0,
-    //             shadows_enabled: true,
-    //             ..default()
-    //         },
-    //         transform: Transform::from_xyz(0.0, 8.0, 0.0),
-    //         ..default()
-    //     })
-    //     .insert(RigidBody::Dynamic)
-    //     .insert(Collider::ball(2.5))
-    //     .insert(Restitution::coefficient(0.7));
     commands
         .spawn_bundle(PointLightBundle {
             point_light: PointLight {
-                intensity: 1500.0,
+                intensity: 15000.0,
+                radius: 100.0,
+                shadows_enabled: true,
+                ..default()
+            },
+            transform: Transform::from_xyz(2.0, 22.0, 50.0),
+            ..default()
+        })
+        .insert(RigidBody::Dynamic)
+        .insert(Collider::ball(4.5))
+        .insert(Restitution::coefficient(0.9));
+    commands
+        .spawn_bundle(PointLightBundle {
+            point_light: PointLight {
+                intensity: 15000.0,
                 shadows_enabled: true,
                 color: Color::ALICE_BLUE,
                 ..default()
@@ -74,7 +77,7 @@ fn setup_world(
     commands
         .spawn_bundle(PointLightBundle {
             point_light: PointLight {
-                intensity: 1500.0,
+                intensity: 15000.0,
                 shadows_enabled: true,
                 color: Color::CRIMSON,
                 ..default()
@@ -88,7 +91,7 @@ fn setup_world(
     commands
         .spawn_bundle(PointLightBundle {
             point_light: PointLight {
-                intensity: 1500.0,
+                intensity: 15000.0,
                 shadows_enabled: true,
                 color: Color::GOLD,
                 ..default()
@@ -118,34 +121,6 @@ fn generate_world(
 struct WorldQuads {
     quads: Vec<Vec<Quad>>,
     size: f32,
-}
-
-struct WorldNoise {
-    high_frequency: Simplex,
-    low_frequency: Simplex,
-}
-impl WorldNoise {
-    fn new() -> Self {
-        Self {
-            high_frequency: Simplex::new(0),
-            low_frequency: Simplex::new(1),
-        }
-    }
-
-    fn get_height(&self, x: usize, z: usize) -> f32 {
-        let high_freqnecy_sample_position = self.to_high_sample(x, z);
-        let low_frequency_sample_position = self.to_low_sample(x, z);
-        (self.high_frequency.get(high_freqnecy_sample_position) * 0.2
-            + self.low_frequency.get(low_frequency_sample_position) * 1.5) as f32
-    }
-
-    fn to_high_sample(&self, x: usize, z: usize) -> [f64; 2] {
-        [x as f64 / 7.0, z as f64 / 7.0]
-    }
-
-    fn to_low_sample(&self, x: usize, z: usize) -> [f64; 2] {
-        [x as f64 / 50.0, z as f64 / 50.0]
-    }
 }
 
 impl WorldQuads {
