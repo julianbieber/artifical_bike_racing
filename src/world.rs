@@ -161,12 +161,13 @@ impl WorldQuads {
             for (z, quad) in quads.iter().enumerate() {
                 let s = surrounding_indices(x, z)
                     .map(|row| row.map(|(x1, z1)| self.get(x1, z1).map(|q| q.height)));
-                positions.extend(quad.to_positions(
+                let (p, n) = quad.to_positions_and_normals(
                     x as f32 - self.size / 2.0,
                     z as f32 - self.size / 2.0,
                     &s,
-                ));
-                normals.extend(quad.to_normals());
+                );
+                positions.extend(p);
+                normals.extend(n);
                 uvs.extend(quad.to_uvs(atlas));
                 indices.extend([
                     current_index,
@@ -213,8 +214,13 @@ struct Quad {
     scale: f32,
 }
 impl Quad {
-    fn to_positions(&self, x: f32, z: f32, surrounding: &[[Option<f32>; 3]; 3]) -> [[f32; 3]; 4] {
-        [
+    fn to_positions_and_normals(
+        &self,
+        x: f32,
+        z: f32,
+        surrounding: &[[Option<f32>; 3]; 3],
+    ) -> ([[f32; 3]; 4], [[f32; 3]; 4]) {
+        let positions = [
             [
                 self.scale * (x + 0.0),
                 [
@@ -267,16 +273,21 @@ impl Quad {
                 .mean() as f32,
                 self.scale * (z + 1.0),
             ],
-        ]
-    }
+        ];
+        let normals = [
+            normal(&positions[0], &positions[1], &positions[2]).to_array(),
+            ((normal(&positions[1], &positions[2], &positions[0])
+                + normal(&positions[1], &positions[2], &positions[3]))
+            .normalize())
+            .to_array(),
+            ((normal(&positions[2], &positions[0], &positions[1])
+                + normal(&positions[2], &positions[3], &positions[1]))
+            .normalize())
+            .to_array(),
+            normal(&positions[3], &positions[2], &positions[1]).to_array(),
+        ];
 
-    fn to_normals(&self) -> [[f32; 3]; 4] {
-        [
-            [0.0, 1.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 1.0, 0.0],
-        ]
+        (positions, normals)
     }
 
     fn to_uvs(&self, atlas: &Atlas<TextureSections>) -> [[f32; 2]; 4] {
@@ -288,4 +299,19 @@ impl Quad {
             [coords.right, coords.top],
         ]
     }
+}
+
+// normal at a, with a triangle spanned by a_b and a_c
+fn normal(a: &[f32; 3], b: &[f32; 3], c: &[f32; 3]) -> Vec3 {
+    let a = Vec3::from_array(a.clone());
+    let b = Vec3::from_array(b.clone());
+    let c = Vec3::from_array(c.clone());
+    let v = b - a;
+    let w = c - a;
+    Vec3::new(
+        v.y * w.z - v.z * w.y,
+        v.z * w.x - v.x * w.z,
+        v.x * w.y - v.y * w.x,
+    )
+    .normalize_or_zero()
 }
