@@ -107,6 +107,7 @@ fn setup_world(
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum TextureSections {
     Grass,
+    Grass2,
 }
 
 fn generate_world(
