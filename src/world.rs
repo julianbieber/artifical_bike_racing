@@ -171,15 +171,19 @@ struct WorldQuads {
 
 impl WorldQuads {
     fn new(size: usize, s: f32) -> WorldQuads {
+        let mut min_height = std::f32::INFINITY;
+        let mut max_height = std::f32::NEG_INFINITY;
         let noise = WorldNoise::new();
         let quads = (0..size)
             .map(|x| {
                 (0..size)
                     .map(|z| {
                         let height = noise.get_height(x, z);
+                        min_height = min_height.min(height);
+                        max_height = max_height.max(height);
                         Quad {
                             height,
-                            texture: TextureSections::Grass,
+                            texture: to_texture(height),
                             scale: s,
                         }
                     })
@@ -187,6 +191,7 @@ impl WorldQuads {
             })
             .collect::<Vec<_>>();
 
+        dbg!(min_height, max_height);
         WorldQuads {
             quads,
             size: size as f32,
@@ -360,4 +365,14 @@ fn normal(a: &[f32; 3], b: &[f32; 3], c: &[f32; 3]) -> Vec3 {
     )
     .abs()
     .normalize_or_zero()
+}
+
+fn to_texture(height: f32) -> TextureSections {
+    match height {
+        x if x < -5.0 => TextureSections::Grass,
+        x if x < 0.0 => TextureSections::Grass2,
+        x if x < 5.0 => TextureSections::Gravel,
+        x if x < 7.0 => TextureSections::Rock,
+        _ => TextureSections::Snow,
+    }
 }

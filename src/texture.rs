@@ -50,7 +50,7 @@ where
             .ambient
             .as_ref()
             .map(|p| read_image(&p))
-            .unwrap_or_else(|| black_image());
+            .unwrap_or_else(|| white_image());
         set_section(&current, &mut ambient, i as u32 * 1024);
 
         uvs.insert(
@@ -87,11 +87,11 @@ fn read_image(path: &Path) -> RgbaImage {
         .into_rgba8()
 }
 
-fn black_image() -> RgbaImage {
+fn white_image() -> RgbaImage {
     let mut i = RgbaImage::new(1024, 1024);
     for x in 0..1024 {
         for y in 0..1024 {
-            i.put_pixel(x, y, image::Rgba([0, 0, 0, 0]));
+            i.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
         }
     }
     i
