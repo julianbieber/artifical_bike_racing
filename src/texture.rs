@@ -27,7 +27,7 @@ pub struct PbrImages {
     pub color: PathBuf,
     pub normal: PathBuf,
     pub roughness: PathBuf,
-    pub ambient: PathBuf,
+    pub ambient: Option<PathBuf>,
 }
 
 pub fn create_texture<A>(images: &[(A, PbrImages)], image_server: &mut Assets<Image>) -> Atlas<A>
@@ -46,7 +46,11 @@ where
         set_section(&current, &mut normal, i as u32 * 1024);
         let current = read_image(&pbr_image.roughness);
         set_section(&current, &mut roughness, i as u32 * 1024);
-        let current = read_image(&pbr_image.ambient);
+        let current = pbr_image
+            .ambient
+            .as_ref()
+            .map(|p| read_image(&p))
+            .unwrap_or_else(|| black_image());
         set_section(&current, &mut ambient, i as u32 * 1024);
 
         uvs.insert(
@@ -81,6 +85,16 @@ fn read_image(path: &Path) -> RgbaImage {
         .unwrap()
         .resize_exact(1024, 1024, FilterType::Gaussian)
         .into_rgba8()
+}
+
+fn black_image() -> RgbaImage {
+    let mut i = RgbaImage::new(1024, 1024);
+    for x in 0..1024 {
+        for y in 0..1024 {
+            i.put_pixel(x, y, image::Rgba([0, 0, 0, 0]));
+        }
+    }
+    i
 }
 
 fn set_section(src: &RgbaImage, dst: &mut RgbaImage, width_offset: u32) {
