@@ -313,5 +313,6 @@ fn normal(a: &[f32; 3], b: &[f32; 3], c: &[f32; 3]) -> Vec3 {
         v.z * w.x - v.x * w.z,
         v.x * w.y - v.y * w.x,
     )
+    .abs()
     .normalize_or_zero()
 }
