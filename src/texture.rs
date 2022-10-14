@@ -49,8 +49,8 @@ where
         let current = pbr_image
             .ambient
             .as_ref()
-            .map(|p| read_image(&p))
-            .unwrap_or_else(|| white_image());
+            .map(|p| read_image(p))
+            .unwrap_or_else(white_image);
         set_section(&current, &mut ambient, i as u32 * 1024);
 
         uvs.insert(

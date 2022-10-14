@@ -324,18 +324,17 @@ impl Quad {
                 self.scale * (z + 1.0),
             ],
         ];
-        let normals = [
-            normal(&positions[0], &positions[1], &positions[2]).to_array(),
-            ((normal(&positions[1], &positions[2], &positions[0])
-                + normal(&positions[1], &positions[2], &positions[3]))
-            .normalize())
-            .to_array(),
-            ((normal(&positions[2], &positions[0], &positions[1])
-                + normal(&positions[2], &positions[3], &positions[1]))
-            .normalize())
-            .to_array(),
-            normal(&positions[3], &positions[2], &positions[1]).to_array(),
-        ];
+        let n0 = normal(positions[0], positions[2], positions[1]).to_array();
+        let n1 = ((normal(positions[1], positions[0], positions[2])
+            + normal(positions[1], positions[2], positions[3]))
+            / 2.0)
+            .to_array();
+        let n2 = ((normal(positions[1], positions[0], positions[2])
+            + normal(positions[1], positions[2], positions[3]))
+            / 2.0)
+            .to_array();
+        let n3 = normal(positions[3], positions[1], positions[2]).to_array();
+        let normals = [n0, n1, n2, n3];
 
         (positions, normals)
     }
@@ -352,10 +351,10 @@ impl Quad {
 }
 
 // normal at a, with a triangle spanned by a_b and a_c
-fn normal(a: &[f32; 3], b: &[f32; 3], c: &[f32; 3]) -> Vec3 {
-    let a = Vec3::from_array(a.clone());
-    let b = Vec3::from_array(b.clone());
-    let c = Vec3::from_array(c.clone());
+fn normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> Vec3 {
+    let a = Vec3::from_array(a);
+    let b = Vec3::from_array(b);
+    let c = Vec3::from_array(c);
     let v = b - a;
     let w = c - a;
     Vec3::new(
@@ -363,7 +362,6 @@ fn normal(a: &[f32; 3], b: &[f32; 3], c: &[f32; 3]) -> Vec3 {
         v.z * w.x - v.x * w.z,
         v.x * w.y - v.y * w.x,
     )
-    .abs()
     .normalize_or_zero()
 }
 
