@@ -15,6 +15,7 @@ struct Opt {
     cont: bool,
 }
 
+mod camera;
 mod noise;
 mod server;
 mod texture;
@@ -40,7 +41,7 @@ fn main() {
     .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
     // .add_plugin(RapierDebugRenderPlugin::default())
     .add_plugin(WorldPlugin {})
-    .add_startup_system(setup_graphics)
+    .add_plugin(camera::CameraPlugin {})
     .add_startup_system(setup_physics)
     .add_system(kill_system);
     if !opt.cont {
@@ -49,14 +50,6 @@ fn main() {
 
     a.run();
     t.join().unwrap();
-}
-
-fn setup_graphics(mut commands: Commands) {
-    // Add a camera so we can see the debug-render.
-    commands.spawn_bundle(Camera3dBundle {
-        transform: Transform::from_xyz(-3.0, 20.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ..Default::default()
-    });
 }
 
 fn setup_physics(
