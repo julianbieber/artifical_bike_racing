@@ -4,6 +4,7 @@ use bevy::{
 };
 
 use crate::{
+    camera::FollowCamera,
     noise::WorldNoise,
     texture::{create_texture, Atlas, PbrImages},
 };
@@ -143,7 +144,8 @@ fn setup_world(
         })
         .insert(RigidBody::Dynamic)
         .insert(Collider::ball(2.5))
-        .insert(Restitution::coefficient(0.7));
+        .insert(Restitution::coefficient(0.7))
+        .insert(FollowCamera { follows: true });
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
