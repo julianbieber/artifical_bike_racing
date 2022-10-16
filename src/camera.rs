@@ -63,8 +63,10 @@ fn move_camera(
                 (motion.delta.y / -30.0).to_radians(),
                 (motion.delta.x / -30.0).to_radians(),
             );
-            transform.rotation = Quat::from_euler(EulerRot::XYZ, rotation.x, rotation.y, 0.0);
         }
+        let x_rot = Quat::from_rotation_x(rotation.x);
+        let y_rot = Quat::from_rotation_y(rotation.y);
+        transform.rotation = (y_rot * x_rot).normalize();
     }
 }
 fn cursor_grab_system(mut windows: ResMut<Windows>) {
