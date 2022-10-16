@@ -9,20 +9,29 @@ impl Plugin for CameraPlugin {
                 CoreStage::PostUpdate,
                 rotate_camera.after(TransformSystem::TransformPropagate),
             )
+            .add_system_to_stage(
+                CoreStage::PostUpdate,
+                fix_camera_global.after(rotate_camera),
+            )
             .add_system(set_camera_follow);
     }
 }
 
 fn setup_graphics(mut commands: Commands) {
     // Add a camera so we can see the debug-render.
-    let camera_transform = Transform::from_xyz(0.0, 0.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y);
+    let camera_transform = Transform::from_xyz(0.0, 4.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y);
     commands
-        .spawn_bundle(Camera3dBundle {
-            transform: camera_transform,
+        .spawn_bundle(TransformBundle {
             ..Default::default()
         })
         .insert(IsChildOf { parent: None })
-        .insert(CameraOrientation::from(camera_transform));
+        .insert(CameraOrientation::from(camera_transform))
+        .with_children(|cb| {
+            cb.spawn_bundle(Camera3dBundle {
+                transform: camera_transform,
+                ..Default::default()
+            });
+        });
 }
 
 #[derive(Component)]
@@ -82,6 +91,24 @@ fn rotate_camera(
         })
     }
 }
+
+fn fix_camera_global(
+    focus: Query<&GlobalTransform, (With<CameraOrientation>, Without<Camera>)>,
+    mut camera_query: Query<&mut GlobalTransform, With<Camera>>,
+) {
+    if let Some(focus) = focus.iter().next() {
+        if let Some(mut camera) = camera_query.iter_mut().next() {
+            let (scale, rotation, translation) = focus.to_scale_rotation_translation();
+            let translation = translation + focus.back() * 30.0;
+            *camera = GlobalTransform::from(Transform {
+                translation,
+                rotation,
+                scale,
+            });
+        }
+    }
+}
+
 fn cursor_grab_system(mut windows: ResMut<Windows>) {
     let window = windows.get_primary_mut().unwrap();
 

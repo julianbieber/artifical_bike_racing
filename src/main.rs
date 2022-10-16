@@ -3,6 +3,7 @@ use bevy::{
     window::{PresentMode, WindowMode},
 };
 use bevy_rapier3d::prelude::*;
+use camera::FollowCamera;
 use clap::Parser;
 use server::{start_server, NextFrame};
 use tokio::{runtime::Runtime, sync::mpsc::Receiver};
@@ -75,7 +76,8 @@ fn setup_physics(
         })
         .insert(RigidBody::Dynamic)
         .insert(Collider::ball(0.5))
-        .insert(Restitution::coefficient(0.7));
+        .insert(Restitution::coefficient(0.7))
+        .insert(FollowCamera { follows: true });
 }
 
 fn print_ball_altitude(
