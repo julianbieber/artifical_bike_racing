@@ -1,4 +1,5 @@
 use ::noise::{NoiseFn, Simplex};
+use noise::Fbm;
 
 pub struct WorldNoise {
     samplers: Vec<NoiseSampler>,
@@ -8,27 +9,27 @@ impl WorldNoise {
         Self {
             samplers: vec![
                 NoiseSampler {
-                    simplex: Simplex::new(0),
+                    simplex: Fbm::new(0),
                     divisor: 50.0,
                     height_multiplier: 2.5,
                 },
                 NoiseSampler {
-                    simplex: Simplex::new(5),
+                    simplex: Fbm::new(5),
                     divisor: 10.0,
                     height_multiplier: 1.5,
                 },
                 NoiseSampler {
-                    simplex: Simplex::new(4),
+                    simplex: Fbm::new(4),
                     divisor: 5.0,
                     height_multiplier: 0.5,
                 },
                 NoiseSampler {
-                    simplex: Simplex::new(3),
+                    simplex: Fbm::new(3),
                     divisor: 75.0,
                     height_multiplier: 5.5,
                 },
                 NoiseSampler {
-                    simplex: Simplex::new(2),
+                    simplex: Fbm::new(2),
                     divisor: 100.0,
                     height_multiplier: 20.5,
                 },
@@ -42,7 +43,7 @@ impl WorldNoise {
 }
 
 struct NoiseSampler {
-    simplex: Simplex,
+    simplex: Fbm<Simplex>,
     divisor: f64,
     height_multiplier: f64,
 }
