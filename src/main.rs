@@ -1,10 +1,11 @@
 use bevy::{
-    prelude::{shape::Icosphere, *},
+    prelude::*,
     window::{PresentMode, WindowMode},
 };
 use bevy_rapier3d::prelude::*;
-use camera::FollowCamera;
+use camera::CameraPlugin;
 use clap::Parser;
+use player::PlayerPlugin;
 use server::{start_server, NextFrame};
 use tokio::{runtime::Runtime, sync::mpsc::Receiver};
 use world::WorldPlugin;
@@ -18,6 +19,7 @@ struct Opt {
 
 mod camera;
 mod noise;
+mod player;
 mod server;
 mod texture;
 mod world;
@@ -42,8 +44,8 @@ fn main() {
     .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
     // .add_plugin(RapierDebugRenderPlugin::default())
     .add_plugin(WorldPlugin {})
-    .add_plugin(camera::CameraPlugin {})
-    .add_startup_system(setup_physics)
+    .add_plugin(CameraPlugin {})
+    .add_plugin(PlayerPlugin {})
     .add_system(kill_system);
     if !opt.cont {
         a.add_system(print_ball_altitude);
@@ -51,33 +53,6 @@ fn main() {
 
     a.run();
     t.join().unwrap();
-}
-
-fn setup_physics(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    /* Create the bouncing ball. */
-    commands
-        .spawn_bundle(PbrBundle {
-            mesh: meshes.add(
-                Icosphere {
-                    radius: 0.5,
-                    subdivisions: 5,
-                }
-                .into(),
-            ),
-            material: materials.add(StandardMaterial {
-                ..Default::default()
-            }),
-            transform: Transform::from_xyz(0.0, 4.0, 0.0),
-            ..Default::default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::ball(0.5))
-        .insert(Restitution::coefficient(0.7))
-        .insert(FollowCamera { follows: true });
 }
 
 fn print_ball_altitude(
