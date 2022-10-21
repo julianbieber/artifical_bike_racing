@@ -8,7 +8,8 @@ pub struct PlayerPlugin {}
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_player)
-            .add_system(player_debug_inputs);
+            .add_system(player_debug_inputs)
+            .add_system(sync_palyer_lights);
     }
 }
 
@@ -18,7 +19,7 @@ fn setup_player(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     /* Create the bouncing ball. */
-    commands
+    let player_entity = commands
         .spawn_bundle(PbrBundle {
             mesh: meshes.add(
                 Icosphere {
@@ -41,17 +42,46 @@ fn setup_player(
             force: Vec3::ZERO,
             torque: Vec3::ZERO,
         })
-        .insert(PlayerMarker {});
+        .insert(PlayerMarker {})
+        .id();
+    commands
+        .spawn_bundle(PointLightBundle {
+            point_light: PointLight {
+                intensity: 15000.0,
+                radius: 100.0,
+                shadows_enabled: true,
+                ..default()
+            },
+            transform: Transform::from_xyz(2.0, 22.0, 50.0),
+            ..default()
+        })
+        .insert(PlayerLight {
+            player: player_entity,
+        });
 }
 
 #[derive(Component)]
 struct PlayerMarker {}
-
+#[derive(Component)]
+struct PlayerLight {
+    player: Entity,
+}
 fn player_debug_inputs(
     keys: Res<Input<KeyCode>>,
     mut player_query: Query<&mut ExternalForce, With<PlayerMarker>>,
 ) {
     for mut impulse in player_query.iter_mut() {
         impulse.force = Vec3::Y * 10.0 * keys.pressed(KeyCode::Space) as i32 as f32;
+    }
+}
+
+fn sync_palyer_lights(
+    player_transforms: Query<&Transform, Without<PlayerLight>>,
+    mut lights: Query<(&mut Transform, &PlayerLight)>,
+) {
+    for (mut light_transform, player) in lights.iter_mut() {
+        if let Some(player_transform) = player_transforms.get(player.player).ok() {
+            light_transform.translation = player_transform.translation + Vec3::Y * 10.0;
+        }
     }
 }
