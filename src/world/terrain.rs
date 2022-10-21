@@ -88,8 +88,15 @@ impl Terrain {
     }
 
     pub fn get_height(&self, x: f32, z: f32) -> Option<f32> {
-        let (x, z) = self.world_to_index(x, z);
+        let (x, z) = dbg!(self.world_to_index(x, z));
         self.get(x, z).map(|q| q.height)
+    }
+
+    pub fn get_dimensions(&self) -> (Vec2, Vec2) {
+        (
+            Vec2::new(self.size / -2.0, self.size / -2.0),
+            Vec2::new(self.size / 2.0, self.size / 2.0),
+        )
     }
 
     fn get(&self, x: usize, z: usize) -> Option<&Quad> {
@@ -102,8 +109,8 @@ impl Terrain {
 
     fn world_to_index(&self, x: f32, z: f32) -> (usize, usize) {
         (
-            (x + self.size * 2.0) as usize,
-            (z + self.size * 2.0) as usize,
+            (x + self.size / 2.0) as usize,
+            (z + self.size / 2.0) as usize,
         )
     }
 }
