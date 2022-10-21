@@ -18,7 +18,6 @@ struct Opt {
 }
 
 mod camera;
-mod noise;
 mod player;
 mod server;
 mod texture;

@@ -1,176 +1,20 @@
+use crate::{texture::Atlas, world::noise::WorldNoise};
+
+use super::load_texture::TextureSections;
 use bevy::{
     prelude::*,
     render::{mesh::Indices, render_resource::PrimitiveTopology},
 };
-
-use crate::{
-    noise::WorldNoise,
-    texture::{create_texture, Atlas, PbrImages},
-};
-use bevy_rapier3d::prelude::*;
+use bevy_rapier3d::prelude::Collider;
 use statrs::statistics::Statistics;
 
-pub struct WorldPlugin {}
-
-impl Plugin for WorldPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_startup_system(setup_world);
-    }
-}
-
-fn setup_world(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut images: ResMut<Assets<Image>>,
-) {
-    let atlas = create_texture(
-        &[
-            (
-                // https://ambientcg.com/view?id=Grass004
-                TextureSections::Grass,
-                PbrImages {
-                    color: "assets/grass/color.png".into(),
-                    normal: "assets/grass/normal.png".into(),
-                    roughness: "assets/grass/roughness.png".into(),
-                    ambient: Some("assets/grass/ambient.png".into()),
-                },
-            ),
-            (
-                // https://ambientcg.com/view?id=Grass004
-                TextureSections::Grass2,
-                PbrImages {
-                    color: "assets/grass2/color.png".into(),
-                    normal: "assets/grass2/normal.png".into(),
-                    roughness: "assets/grass2/roughness.png".into(),
-                    ambient: Some("assets/grass2/ambient.png".into()),
-                },
-            ),
-            (
-                // https://ambientcg.com/view?id=Grass004
-                TextureSections::Gravel,
-                PbrImages {
-                    color: "assets/gravel/color.png".into(),
-                    normal: "assets/gravel/normal.png".into(),
-                    roughness: "assets/gravel/roughness.png".into(),
-                    ambient: Some("assets/gravel/ambient.png".into()),
-                },
-            ),
-            (
-                // https://ambientcg.com/view?id=Grass004
-                TextureSections::Rock,
-                PbrImages {
-                    color: "assets/rock/color.png".into(),
-                    normal: "assets/rock/normal.png".into(),
-                    roughness: "assets/rock/roughness.png".into(),
-                    ambient: Some("assets/rock/ambient.png".into()),
-                },
-            ),
-            (
-                // https://ambientcg.com/view?id=Grass004
-                TextureSections::Snow,
-                PbrImages {
-                    color: "assets/snow/color.png".into(),
-                    normal: "assets/snow/normal.png".into(),
-                    roughness: "assets/snow/roughness.png".into(),
-                    ambient: None,
-                },
-            ),
-        ],
-        &mut images,
-    );
-    let (mesh, collider) = generate_world(&atlas, 430, 1.0);
-    let mesh = meshes.add(mesh);
-    commands
-        .spawn_bundle(PbrBundle {
-            mesh,
-            material: materials.add(atlas.material),
-            ..Default::default()
-        })
-        .insert(collider);
-    commands
-        .spawn_bundle(PointLightBundle {
-            point_light: PointLight {
-                intensity: 15000.0,
-                radius: 100.0,
-                shadows_enabled: true,
-                ..default()
-            },
-            transform: Transform::from_xyz(2.0, 22.0, 50.0),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::ball(4.5))
-        .insert(Restitution::coefficient(0.9));
-    commands
-        .spawn_bundle(PointLightBundle {
-            point_light: PointLight {
-                intensity: 15000.0,
-                shadows_enabled: true,
-                color: Color::ALICE_BLUE,
-                ..default()
-            },
-            transform: Transform::from_xyz(2.0, 22.0, 0.0),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::ball(4.5))
-        .insert(Restitution::coefficient(1.9));
-    commands
-        .spawn_bundle(PointLightBundle {
-            point_light: PointLight {
-                intensity: 15000.0,
-                shadows_enabled: true,
-                color: Color::CRIMSON,
-                ..default()
-            },
-            transform: Transform::from_xyz(-4.0, 8.0, 0.0),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::ball(2.5))
-        .insert(Restitution::coefficient(0.8));
-    commands
-        .spawn_bundle(PointLightBundle {
-            point_light: PointLight {
-                intensity: 15000.0,
-                shadows_enabled: true,
-                color: Color::GOLD,
-                ..default()
-            },
-            transform: Transform::from_xyz(4.0, 8.0, 0.0),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::ball(2.5))
-        .insert(Restitution::coefficient(0.7));
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-enum TextureSections {
-    Grass,
-    Grass2,
-    Gravel,
-    Rock,
-    Snow,
-}
-
-fn generate_world(
-    atlas: &Atlas<TextureSections>,
-    subdivisions: usize,
-    size: f32,
-) -> (Mesh, Collider) {
-    let quads = WorldQuads::new(subdivisions, size);
-    quads.to_mesh(atlas)
-}
-
-struct WorldQuads {
+pub struct Terrain {
     quads: Vec<Vec<Quad>>,
     size: f32,
 }
 
-impl WorldQuads {
-    fn new(size: usize, s: f32) -> WorldQuads {
+impl Terrain {
+    pub fn new(size: usize, s: f32) -> Terrain {
         let mut min_height = std::f32::INFINITY;
         let mut max_height = std::f32::NEG_INFINITY;
         let noise = WorldNoise::new();
@@ -192,13 +36,13 @@ impl WorldQuads {
             .collect::<Vec<_>>();
 
         dbg!(min_height, max_height);
-        WorldQuads {
+        Terrain {
             quads,
             size: size as f32,
         }
     }
 
-    fn to_mesh(&self, atlas: &Atlas<TextureSections>) -> (Mesh, Collider) {
+    pub fn to_mesh(&self, atlas: &Atlas<TextureSections>) -> (Mesh, Collider) {
         let mut positions: Vec<[f32; 3]> =
             Vec::with_capacity(self.quads.len() * self.quads.len() * 4);
         let mut normals: Vec<[f32; 3]> =
@@ -211,11 +55,8 @@ impl WorldQuads {
             for (z, quad) in quads.iter().enumerate() {
                 let s = surrounding_indices(x, z)
                     .map(|row| row.map(|(x1, z1)| self.get(x1, z1).map(|q| q.height)));
-                let (p, n) = quad.to_positions_and_normals(
-                    x as f32 - self.size / 2.0,
-                    z as f32 - self.size / 2.0,
-                    &s,
-                );
+                let (world_x, world_z) = self.index_to_world(x, z);
+                let (p, n) = quad.to_positions_and_normals(world_x, world_z, &s);
                 positions.extend(p);
                 normals.extend(n);
                 uvs.extend(quad.to_uvs(atlas));
@@ -246,8 +87,24 @@ impl WorldQuads {
         (mesh, collider)
     }
 
+    pub fn get_height(&self, x: f32, z: f32) -> Option<f32> {
+        let (x, z) = self.world_to_index(x, z);
+        self.get(x, z).map(|q| q.height)
+    }
+
     fn get(&self, x: usize, z: usize) -> Option<&Quad> {
         self.quads.get(x).and_then(|q| q.get(z))
+    }
+
+    fn index_to_world(&self, x: usize, z: usize) -> (f32, f32) {
+        (x as f32 - self.size / 2.0, z as f32 - self.size / 2.0)
+    }
+
+    fn world_to_index(&self, x: f32, z: f32) -> (usize, usize) {
+        (
+            (x + self.size * 2.0) as usize,
+            (z + self.size * 2.0) as usize,
+        )
     }
 }
 fn surrounding_indices(x: usize, z: usize) -> [[(usize, usize); 3]; 3] {
