@@ -55,6 +55,7 @@ fn setup_player(
                     torque: Vec3::ZERO,
                 })
                 .insert(PlayerMarker {})
+                .insert(ActiveEvents::COLLISION_EVENTS)
                 .id();
             commands
                 .spawn_bundle(PointLightBundle {
@@ -75,7 +76,7 @@ fn setup_player(
 }
 
 #[derive(Component)]
-struct PlayerMarker {}
+pub struct PlayerMarker {}
 #[derive(Component)]
 struct PlayerLight {
     player: Entity,
@@ -94,7 +95,7 @@ fn sync_palyer_lights(
     mut lights: Query<(&mut Transform, &PlayerLight)>,
 ) {
     for (mut light_transform, player) in lights.iter_mut() {
-        if let Some(player_transform) = player_transforms.get(player.player).ok() {
+        if let Ok(player_transform) = player_transforms.get(player.player) {
             light_transform.translation = player_transform.translation + Vec3::Y * 10.0;
         }
     }

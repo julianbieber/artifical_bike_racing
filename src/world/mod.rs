@@ -1,3 +1,4 @@
+mod checkpoint;
 mod load_texture;
 mod noise;
 mod terrain;
@@ -8,13 +9,21 @@ use bevy::prelude::{shape::Cube, *};
 use crate::texture::Atlas;
 use bevy_rapier3d::prelude::*;
 
-use self::{load_texture::setup_texture_atlas, terrain::Terrain};
+use self::{
+    checkpoint::{checkpoint_collection, setup_checkpoints, History},
+    load_texture::setup_texture_atlas,
+    terrain::Terrain,
+};
 
 pub struct WorldPlugin {}
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup_world);
+        app.insert_resource(History {
+            collected_checkpoints: Vec::with_capacity(256),
+        })
+        .add_system(checkpoint_collection)
+        .add_startup_system(setup_world);
     }
 }
 
@@ -26,7 +35,15 @@ fn setup_world(
 ) {
     let atlas = setup_texture_atlas(&mut images);
     let (mesh, collider, terrain) = generate_world(&atlas, 430, 1.0);
-    setup_start_cube(&mut commands, &terrain, &mut meshes, &mut materials);
+    let start_cube_position =
+        setup_start_cube(&mut commands, &terrain, &mut meshes, &mut materials);
+    setup_checkpoints(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &terrain,
+        start_cube_position,
+    );
     commands.insert_resource(terrain);
     let mesh = meshes.add(mesh);
     commands
@@ -99,7 +116,7 @@ fn setup_start_cube(
     terrain: &Terrain,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
-) {
+) -> Vec3 {
     let (_min, max) = dbg!(terrain.get_dimensions());
     if let Some(edge_height) = terrain.get_height(0.0, dbg!(max.y - 1.0)) {
         let cube_position = Vec3::new(0.0, edge_height - 2.0, max.y);
@@ -116,6 +133,7 @@ fn setup_start_cube(
             .insert(StartBlock { size: 4.0 })
             .insert(RigidBody::Fixed)
             .insert(Collider::cuboid(2.0, 2.0, 2.0));
+        cube_position
     } else {
         panic!("cound not palce start block");
     }
