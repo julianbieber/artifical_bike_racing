@@ -10,7 +10,7 @@ use crate::texture::Atlas;
 use bevy_rapier3d::prelude::*;
 
 use self::{
-    checkpoint::{checkpoint_collection, setup_checkpoints, History},
+    checkpoint::{checkpoint_collection, only_show_next_checkpoint, setup_checkpoints, History},
     load_texture::setup_texture_atlas,
     terrain::Terrain,
 };
@@ -23,6 +23,7 @@ impl Plugin for WorldPlugin {
             collected_checkpoints: Vec::with_capacity(256),
         })
         .add_system(checkpoint_collection)
+        .add_system(only_show_next_checkpoint)
         .add_startup_system(setup_world);
     }
 }
@@ -53,62 +54,6 @@ fn setup_world(
             ..Default::default()
         })
         .insert(collider);
-    commands
-        .spawn_bundle(PointLightBundle {
-            point_light: PointLight {
-                intensity: 15000.0,
-                radius: 100.0,
-                shadows_enabled: true,
-                ..default()
-            },
-            transform: Transform::from_xyz(2.0, 22.0, 50.0),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::ball(4.5))
-        .insert(Restitution::coefficient(0.9));
-    commands
-        .spawn_bundle(PointLightBundle {
-            point_light: PointLight {
-                intensity: 15000.0,
-                shadows_enabled: true,
-                color: Color::ALICE_BLUE,
-                ..default()
-            },
-            transform: Transform::from_xyz(2.0, 22.0, 0.0),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::ball(4.5))
-        .insert(Restitution::coefficient(1.9));
-    commands
-        .spawn_bundle(PointLightBundle {
-            point_light: PointLight {
-                intensity: 15000.0,
-                shadows_enabled: true,
-                color: Color::CRIMSON,
-                ..default()
-            },
-            transform: Transform::from_xyz(-4.0, 8.0, 0.0),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::ball(2.5))
-        .insert(Restitution::coefficient(0.8));
-    commands
-        .spawn_bundle(PointLightBundle {
-            point_light: PointLight {
-                intensity: 15000.0,
-                shadows_enabled: true,
-                color: Color::GOLD,
-                ..default()
-            },
-            transform: Transform::from_xyz(4.0, 8.0, 0.0),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::ball(2.5))
-        .insert(Restitution::coefficient(0.7));
 }
 
 fn setup_start_cube(
