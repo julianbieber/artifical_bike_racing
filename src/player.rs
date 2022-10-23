@@ -86,7 +86,11 @@ fn player_debug_inputs(
     mut player_query: Query<&mut ExternalForce, With<PlayerMarker>>,
 ) {
     for mut impulse in player_query.iter_mut() {
-        impulse.force = Vec3::Y * 10.0 * keys.pressed(KeyCode::Space) as i32 as f32;
+        impulse.force = Vec3::Y * 10.0 * keys.pressed(KeyCode::Space) as i32 as f32
+            + Vec3::Z * 10.0 * keys.pressed(KeyCode::W) as i32 as f32
+            + Vec3::Z * -10.0 * keys.pressed(KeyCode::S) as i32 as f32
+            + Vec3::X * 10.0 * keys.pressed(KeyCode::A) as i32 as f32
+            + Vec3::X * -10.0 * keys.pressed(KeyCode::D) as i32 as f32;
     }
 }
 
