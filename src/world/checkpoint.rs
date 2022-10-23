@@ -38,10 +38,14 @@ pub fn setup_checkpoints(
         subdivisions: 8,
     }));
 
-    spawn_checkpoint(start_cube, commands, mesh.clone(), material.clone());
-    for c in create_track(Vec2::new(start_cube.x, start_cube.z)) {
+    spawn_checkpoint(0, start_cube, commands, mesh.clone(), material.clone());
+    for (i, c) in create_track(Vec2::new(start_cube.x, start_cube.z))
+        .into_iter()
+        .enumerate()
+    {
         if let Some(height) = _terrain.get_height(c.x, c.y) {
             spawn_checkpoint(
+                (i + 1) as u8,
                 Vec3::new(c.x, height, c.y),
                 commands,
                 mesh.clone(),
@@ -52,6 +56,7 @@ pub fn setup_checkpoints(
 }
 
 fn spawn_checkpoint(
+    number: u8,
     translation: Vec3,
     commands: &mut Commands,
     mesh: Handle<Mesh>,
@@ -66,7 +71,7 @@ fn spawn_checkpoint(
         })
         .insert(Collider::ball(3.0))
         .insert(Sensor)
-        .insert(Checkpoint { number: 0 })
+        .insert(Checkpoint { number })
         .with_children(|cb| {
             cb.spawn_bundle(PointLightBundle {
                 point_light: PointLight {
