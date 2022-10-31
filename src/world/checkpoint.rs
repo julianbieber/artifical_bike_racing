@@ -1,5 +1,9 @@
+use bevy::math::Affine2;
 use bevy::prelude::{shape::Icosphere, *};
 use bevy_rapier3d::prelude::*;
+use rand::distributions::Standard;
+use rand::prelude::*;
+use rand::rngs::SmallRng;
 
 use crate::player::PlayerMarker;
 
@@ -129,5 +133,72 @@ pub fn only_show_next_checkpoint(
 }
 
 fn create_track(start: Vec2) -> Vec<Vec2> {
-    vec![start + Vec2::new(-1.0, -10.0)]
+    let generator = TrackGenerator::new(0, Vec2::new(-1.0, -10.0));
+    generator.generate(start)
+}
+
+struct TrackGenerator {
+    rng: SmallRng,
+    current_direction: Vec2,
+    state: DirectionState,
+    same_direction_count: u32,
+}
+impl TrackGenerator {
+    fn new(seed: u64, direction: Vec2) -> Self {
+        Self {
+            rng: SmallRng::seed_from_u64(seed),
+            current_direction: direction,
+            state: DirectionState::Forward,
+            same_direction_count: 1,
+        }
+    }
+
+    fn generate(mut self, start: Vec2) -> Vec<Vec2> {
+        let mut current = start;
+        (0..20)
+            .map(|_| {
+                current = dbg!(current + dbg!(self.current_direction));
+                self.step();
+                current
+            })
+            .collect()
+    }
+
+    fn step(&mut self) {
+        let random = self.rng.gen_range(0..10);
+        let change = random < self.same_direction_count;
+        self.same_direction_count = !change as u32 * self.same_direction_count + 1;
+        if change {
+            self.state = self.rng.gen::<DirectionState>();
+        }
+        self.current_direction = match self.state {
+            DirectionState::Forward => self.current_direction,
+            DirectionState::Left => {
+                let direction = Affine2::from_translation(self.current_direction);
+                (Affine2::from_angle(0.25) * direction).translation
+            }
+            DirectionState::Right => {
+                let direction = Affine2::from_translation(self.current_direction);
+                (Affine2::from_angle(-0.25) * direction).translation
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum DirectionState {
+    Forward,
+    Left,
+    Right,
+}
+
+impl Distribution<DirectionState> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> DirectionState {
+        match rng.gen_range(0..=2) {
+            0 => DirectionState::Forward,
+            1 => DirectionState::Left,
+            2 => DirectionState::Right,
+            _ => unreachable!(),
+        }
+    }
 }

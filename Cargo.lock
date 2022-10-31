@@ -133,6 +133,7 @@ dependencies = [
  "image",
  "noise",
  "prost",
+ "rand 0.8.5",
  "statrs",
  "tokio",
  "tonic",

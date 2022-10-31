@@ -17,6 +17,7 @@ clap = {version = "4", features = ["derive"]}
 image = "0.24"
 noise = "0.8"
 statrs = "0.16"
+rand = {version = "0.8", features = ["small_rng"]}
 
 [build-dependencies]
 tonic-build = "0.8"
