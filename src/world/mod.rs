@@ -3,7 +3,10 @@ mod load_texture;
 mod noise;
 mod terrain;
 
-use bevy::prelude::{shape::Cube, *};
+use bevy::{
+    prelude::{shape::Cube, *},
+    render::view::NoFrustumCulling,
+};
 
 use bevy_rapier3d::prelude::*;
 
@@ -52,6 +55,7 @@ fn setup_world(
             material: materials.add(atlas.material),
             ..Default::default()
         })
+        .insert(NoFrustumCulling {})
         .insert(collider);
 }
 
@@ -76,6 +80,7 @@ fn setup_start_cube(
             })
             .insert(StartBlock { size: 4.0 })
             .insert(RigidBody::Fixed)
+            .insert(NoFrustumCulling {})
             .insert(Collider::cuboid(2.0, 2.0, 2.0));
         cube_position
     } else {

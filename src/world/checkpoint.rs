@@ -1,5 +1,6 @@
 use bevy::math::Affine2;
 use bevy::prelude::{shape::Icosphere, *};
+use bevy::render::view::NoFrustumCulling;
 use bevy_rapier3d::prelude::*;
 use rand::distributions::Standard;
 use rand::prelude::*;
@@ -42,14 +43,20 @@ pub fn setup_checkpoints(
         subdivisions: 8,
     }));
 
-    spawn_checkpoint(0, start_cube, commands, mesh.clone(), material.clone());
+    spawn_checkpoint(
+        0,
+        start_cube + Vec3::Y,
+        commands,
+        mesh.clone(),
+        material.clone(),
+    );
     let track = create_track(Vec2::new(start_cube.x, start_cube.z));
     terrain.register_road(&track);
     for (i, c) in track.into_iter().enumerate() {
         if let Some(height) = terrain.get_height(c.x, c.y) {
             spawn_checkpoint(
                 (i + 1) as u8,
-                Vec3::new(c.x, height, c.y),
+                Vec3::new(c.x, height + 3.0, c.y),
                 commands,
                 mesh.clone(),
                 material.clone(),
@@ -72,6 +79,7 @@ fn spawn_checkpoint(
             material,
             ..Default::default()
         })
+        .insert(NoFrustumCulling {})
         .insert(Collider::ball(3.0))
         .insert(Sensor)
         .insert(Checkpoint { number })

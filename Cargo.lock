@@ -643,9 +643,9 @@ checksum = "9960c19e582b43cebe1894b6679520a4f50802d1cc5b6fa432f8d685ed232f09"
 
 [[package]]
 name = "bevy_rapier3d"
-version = "0.16.2"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9fd7a0ffc55bf7c127f9e1877481c57d42ff0f04530550cdf209dd136485ecb"
+checksum = "3b41fdcfb3ad9034e3e6a682f835356a98f7f3fa8841ba7f5b6506a94514781c"
 dependencies = [
  "bevy",
  "bitflags",
@@ -2493,7 +2493,7 @@ dependencies = [
  "num-complex",
  "num-rational",
  "num-traits",
- "simba 0.7.2",
+ "simba 0.7.3",
  "typenum",
 ]
 
@@ -2887,9 +2887,9 @@ dependencies = [
 
 [[package]]
 name = "parry3d"
-version = "0.9.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89cd07f0e1e9e207662f430a4e758c357fdf89450a548ef1ce59113822fd5fa7"
+checksum = "ee763b47e68f62d578bcfc3f83cf75d9d970aed5df20b6d90287ca9b3195155d"
 dependencies = [
  "approx",
  "arrayvec",
@@ -2900,7 +2900,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "rustc-hash",
- "simba 0.7.2",
+ "simba 0.7.3",
  "slab",
  "smallvec",
  "spade",
@@ -3225,9 +3225,9 @@ checksum = "63e935c45e09cc6dcf00d2f0b2d630a58f4095320223d47fc68918722f0538b6"
 
 [[package]]
 name = "rapier3d"
-version = "0.14.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32f2decdbd39b70bfb3a5dc9e725ea0465b39401052cc8b03c0f81206f4b9129"
+checksum = "bfab9e1384b38fccb76f2c4d799b94e8214fa1913e657e4645efbce5ba88bd02"
 dependencies = [
  "approx",
  "arrayvec",
@@ -3240,7 +3240,7 @@ dependencies = [
  "num-traits",
  "parry3d",
  "rustc-hash",
- "simba 0.7.2",
+ "simba 0.7.3",
  "vec_map",
 ]
 
@@ -3480,9 +3480,9 @@ dependencies = [
 
 [[package]]
 name = "simba"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c48e45e5961033db030b56ad67aef22e9c908c493a6e8348c0a0f6b93433cd77"
+checksum = "2f3fd720c48c53cace224ae62bef1bbff363a70c68c4802a78b5cc6159618176"
 dependencies = [
  "approx",
  "num-complex",
