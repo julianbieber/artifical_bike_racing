@@ -1,4 +1,5 @@
 use bevy::{
+    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     prelude::*,
     window::{PresentMode, WindowMode},
 };
@@ -45,6 +46,10 @@ fn main() {
     .add_plugin(WorldPlugin {})
     .add_plugin(CameraPlugin {})
     .add_plugin(PlayerPlugin {})
+    .add_plugin(FrameTimeDiagnosticsPlugin::default())
+    .add_plugin(LogDiagnosticsPlugin {
+        ..Default::default()
+    })
     .add_system(kill_system);
     if !opt.cont {
         a.add_system(print_ball_altitude);
