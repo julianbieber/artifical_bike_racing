@@ -132,7 +132,7 @@ pub fn only_show_next_checkpoint(
 }
 
 fn create_track(start: Vec2) -> Vec<Vec2> {
-    let generator = TrackGenerator::new(0, Vec2::new(-1.0, -10.0));
+    let generator = TrackGenerator::new(2, Vec2::new(-1.0, -10.0));
     generator.generate(start)
 }
 
@@ -174,11 +174,11 @@ impl TrackGenerator {
             DirectionState::Forward => self.current_direction,
             DirectionState::Left => {
                 let direction = Affine2::from_translation(self.current_direction);
-                (Affine2::from_angle(self.rng.gen_range(0.0..0.4)) * direction).translation
+                (Affine2::from_angle(self.rng.gen_range(0.0..1.0)) * direction).translation
             }
             DirectionState::Right => {
                 let direction = Affine2::from_translation(self.current_direction);
-                (Affine2::from_angle(self.rng.gen_range(-0.4..0.0)) * direction).translation
+                (Affine2::from_angle(self.rng.gen_range(-1.0..0.0)) * direction).translation
             }
         }
     }
