@@ -88,7 +88,7 @@ impl Terrain {
     }
 
     pub fn get_height(&self, x: f32, z: f32) -> Option<f32> {
-        let (x, z) = dbg!(self.world_to_index(x, z));
+        let (x, z) = self.world_to_index(x, z);
         self.get(x, z).map(|q| q.height)
     }
 
@@ -102,6 +102,9 @@ impl Terrain {
     fn get(&self, x: usize, z: usize) -> Option<&Quad> {
         self.quads.get(x).and_then(|q| q.get(z))
     }
+    fn get_mut(&mut self, x: usize, z: usize) -> Option<&mut Quad> {
+        self.quads.get_mut(x).and_then(|q| q.get_mut(z))
+    }
 
     fn index_to_world(&self, x: usize, z: usize) -> (f32, f32) {
         (x as f32 - self.size / 2.0, z as f32 - self.size / 2.0)
@@ -113,7 +116,39 @@ impl Terrain {
             (z + self.size / 2.0) as usize,
         )
     }
+
+    pub fn register_road(&mut self, points: &[Vec2]) {
+        for window in points.windows(2) {
+            let start = window[0];
+            let end = window[1];
+            for p in between(start, end, self.size / (self.quads.len() as f32)) {
+                let (x, z) = self.world_to_index(p.x, p.y);
+                self.draw(x, z, 3, TextureSections::Rock);
+            }
+        }
+    }
+
+    fn draw(&mut self, x: usize, z: usize, remaining: usize, t: TextureSections) {
+        if let Some(c) = self.get_mut(x, z) {
+            c.texture = t;
+        }
+        if remaining > 0 {
+            for s in surrounding_indices(x, z) {
+                for s in s {
+                    self.draw(s.0, s.1, remaining - 1, t);
+                }
+            }
+        }
+    }
 }
+
+fn between(start: Vec2, end: Vec2, step: f32) -> Vec<Vec2> {
+    let direction = end - start;
+    let steps = (direction.length() / step).ceil() as usize;
+    let direction = direction.normalize() * step;
+    (0..steps).map(|i| start + direction * i as f32).collect()
+}
+
 fn surrounding_indices(x: usize, z: usize) -> [[(usize, usize); 3]; 3] {
     [
         [(x - 1, z - 1), (x, z - 1), (x + 1, z - 1)],

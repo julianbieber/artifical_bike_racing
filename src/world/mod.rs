@@ -3,10 +3,8 @@ mod load_texture;
 mod noise;
 mod terrain;
 
-use crate::world::load_texture::TextureSections;
 use bevy::prelude::{shape::Cube, *};
 
-use crate::texture::Atlas;
 use bevy_rapier3d::prelude::*;
 
 use self::{
@@ -35,16 +33,17 @@ fn setup_world(
     mut images: ResMut<Assets<Image>>,
 ) {
     let atlas = setup_texture_atlas(&mut images);
-    let (mesh, collider, terrain) = generate_world(&atlas, 430, 1.0);
+    let mut terrain = Terrain::new(430, 1.0);
     let start_cube_position =
         setup_start_cube(&mut commands, &terrain, &mut meshes, &mut materials);
     setup_checkpoints(
         &mut commands,
         &mut meshes,
         &mut materials,
-        &terrain,
+        &mut terrain,
         start_cube_position,
     );
+    let (mesh, collider) = terrain.to_mesh(&atlas);
     commands.insert_resource(terrain);
     let mesh = meshes.add(mesh);
     commands
@@ -87,14 +86,4 @@ fn setup_start_cube(
 #[derive(Component)]
 pub struct StartBlock {
     pub size: f32,
-}
-
-fn generate_world(
-    atlas: &Atlas<TextureSections>,
-    subdivisions: usize,
-    size: f32,
-) -> (Mesh, Collider, Terrain) {
-    let quads = Terrain::new(subdivisions, size);
-    let (mesh, collider) = quads.to_mesh(atlas);
-    (mesh, collider, quads)
 }

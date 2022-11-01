@@ -29,7 +29,7 @@ pub fn setup_checkpoints(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
-    _terrain: &Terrain,
+    terrain: &mut Terrain,
     start_cube: Vec3,
 ) {
     let material = materials.add(StandardMaterial {
@@ -43,11 +43,10 @@ pub fn setup_checkpoints(
     }));
 
     spawn_checkpoint(0, start_cube, commands, mesh.clone(), material.clone());
-    for (i, c) in create_track(Vec2::new(start_cube.x, start_cube.z))
-        .into_iter()
-        .enumerate()
-    {
-        if let Some(height) = _terrain.get_height(c.x, c.y) {
+    let track = create_track(Vec2::new(start_cube.x, start_cube.z));
+    terrain.register_road(&track);
+    for (i, c) in track.into_iter().enumerate() {
+        if let Some(height) = terrain.get_height(c.x, c.y) {
             spawn_checkpoint(
                 (i + 1) as u8,
                 Vec3::new(c.x, height, c.y),
@@ -155,9 +154,9 @@ impl TrackGenerator {
 
     fn generate(mut self, start: Vec2) -> Vec<Vec2> {
         let mut current = start;
-        (0..20)
+        (0..50)
             .map(|_| {
-                current = dbg!(current + dbg!(self.current_direction));
+                current += self.current_direction;
                 self.step();
                 current
             })
@@ -175,11 +174,11 @@ impl TrackGenerator {
             DirectionState::Forward => self.current_direction,
             DirectionState::Left => {
                 let direction = Affine2::from_translation(self.current_direction);
-                (Affine2::from_angle(0.25) * direction).translation
+                (Affine2::from_angle(self.rng.gen_range(0.0..0.4)) * direction).translation
             }
             DirectionState::Right => {
                 let direction = Affine2::from_translation(self.current_direction);
-                (Affine2::from_angle(-0.25) * direction).translation
+                (Affine2::from_angle(self.rng.gen_range(-0.4..0.0)) * direction).translation
             }
         }
     }
