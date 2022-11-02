@@ -10,7 +10,7 @@ use tokio::{
 use tonic::{transport::Server, Request, Response, Status};
 
 use self::game::main_service_server::MainServiceServer;
-use self::game::{main_service_server::MainService, Empty};
+use self::game::{main_service_server::MainService, Empty, InputRequest};
 
 pub mod game {
     #![allow(clippy::all)]
@@ -21,7 +21,10 @@ pub mod game {
 
 pub struct FrameState {}
 #[derive(Debug)]
-pub struct NextFrame {}
+pub struct NextFrame {
+    pub x: f32,
+    pub z: f32,
+}
 
 pub fn start_server(
     frame_receiver: Receiver<FrameState>,
@@ -31,7 +34,10 @@ pub fn start_server(
     std::thread::spawn(move || {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            next_frame_sender.send(NextFrame {}).await.unwrap();
+            next_frame_sender
+                .send(NextFrame { x: 0.0, z: 0.0 })
+                .await
+                .unwrap();
             let addr = format!("[::1]:{port}").parse().unwrap();
             let game_server = GameServer {
                 frame_receiver: Mutex::new(frame_receiver),
@@ -72,9 +78,13 @@ impl MainService for GameServer {
             Err(Status::not_found("no new game state available"))
         }
     }
-    async fn input(&self, _r: Request<Empty>) -> Result<Response<Empty>, Status> {
+    async fn input(&self, r: Request<InputRequest>) -> Result<Response<Empty>, Status> {
+        let input = r.into_inner();
         self.next_frame_sender
-            .send(NextFrame {})
+            .send(NextFrame {
+                x: input.x,
+                z: input.z,
+            })
             .await
             .map_err(|e| Status::unknown(format!("{e:?}")))?;
         Ok(Response::new(Empty {}))

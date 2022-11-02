@@ -5,7 +5,12 @@ package game;
 service MainService {
   rpc health(Empty) returns (Empty); 
   rpc getState(Empty) returns (Empty);
-  rpc input(Empty) returns (Empty);
+  rpc input(InputRequest) returns (Empty);
 }
 
 message Empty {}
+
+message InputRequest {
+  float x = 1;
+  float z = 2;
+}

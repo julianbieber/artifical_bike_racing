@@ -1,10 +1,14 @@
 use bevy::{input::mouse::MouseMotion, prelude::*, transform::TransformSystem};
 
-pub struct CameraPlugin {}
+pub struct CameraPlugin {
+    pub active: bool,
+}
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
+        if self.active {
+            app.add_startup_system(cursor_grab_system);
+        }
         app.add_startup_system(setup_graphics)
-            .add_startup_system(cursor_grab_system)
             .add_system_to_stage(
                 CoreStage::PostUpdate,
                 rotate_camera.after(TransformSystem::TransformPropagate),

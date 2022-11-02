@@ -1,16 +1,23 @@
 use bevy::prelude::{shape::Icosphere, *};
 use bevy_rapier3d::prelude::*;
+use tokio::{runtime::Runtime, sync::mpsc::Receiver};
 
-use crate::{camera::FollowCamera, world::StartBlock};
+use crate::{camera::FollowCamera, server::NextFrame, world::StartBlock};
 
-pub struct PlayerPlugin {}
+pub struct PlayerPlugin {
+    pub grpc: bool,
+}
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Initialized { is: false })
             .add_system(setup_player)
-            .add_system(player_debug_inputs)
             .add_system(sync_palyer_lights);
+        if self.grpc {
+            app.add_system(player_input_grpc);
+        } else {
+            app.add_system(player_debug_inputs);
+        }
     }
 }
 
@@ -92,6 +99,19 @@ fn player_debug_inputs(
             + Vec3::X * 10.0 * keys.pressed(KeyCode::A) as i32 as f32
             + Vec3::X * -10.0 * keys.pressed(KeyCode::D) as i32 as f32;
     }
+}
+
+fn player_input_grpc(
+    runtime: Res<Runtime>,
+    mut next_frame_receiver: ResMut<Receiver<NextFrame>>,
+    mut player_query: Query<&mut ExternalForce, With<PlayerMarker>>,
+) {
+    runtime.block_on(async {
+        let force = next_frame_receiver.recv().await.unwrap();
+        for mut impulse in player_query.iter_mut() {
+            impulse.force = Vec3::new(force.x, 0.0, force.z);
+        }
+    });
 }
 
 fn sync_palyer_lights(
