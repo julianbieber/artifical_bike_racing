@@ -89,4 +89,7 @@ impl MainService for GameServer {
             .map_err(|e| Status::unknown(format!("{e:?}")))?;
         Ok(Response::new(Empty {}))
     }
+    async fn kill(&self, _r: Request<Empty>) -> Result<Response<Empty>, Status> {
+        std::process::exit(0);
+    }
 }
