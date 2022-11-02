@@ -51,7 +51,9 @@ pub fn setup_checkpoints(
         material.clone(),
     );
     let track = create_track(Vec2::new(start_cube.x, start_cube.z));
-    terrain.register_road(&track);
+    let mut track_with_start = vec![Vec2::new(start_cube.x, start_cube.z)];
+    track_with_start.extend(track.iter());
+    terrain.register_road(&track_with_start);
     for (i, c) in track.into_iter().enumerate() {
         if let Some(height) = terrain.get_height(c.x, c.y) {
             spawn_checkpoint(

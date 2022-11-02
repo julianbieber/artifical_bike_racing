@@ -121,7 +121,7 @@ impl Terrain {
         for window in points.windows(2) {
             let start = window[0];
             let end = window[1];
-            for p in between(start, end, self.size / (self.quads.len() as f32)) {
+            for p in between(end, start, self.size / (self.quads.len() as f32)) {
                 let (x, z) = self.world_to_index(p.x, p.y);
                 self.draw(x, z, 3, TextureSections::Rock);
             }
