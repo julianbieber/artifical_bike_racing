@@ -4,6 +4,7 @@ use super::load_texture::TextureSections;
 use bevy::{
     prelude::*,
     render::{mesh::Indices, render_resource::PrimitiveTopology},
+    utils::HashSet,
 };
 use bevy_rapier3d::prelude::Collider;
 use statrs::statistics::Statistics;
@@ -123,22 +124,35 @@ impl Terrain {
             let end = window[1];
             for p in between(end, start, self.size / (self.quads.len() as f32)) {
                 let (x, z) = self.world_to_index(p.x, p.y);
-                self.draw(x, z, 3, TextureSections::Rock);
+                let surrounding = self.surrounding(x, z, 3);
+                let height = surrounding
+                    .iter()
+                    .flat_map(|i| self.get(i.0, i.1).map(|c| c.height as f64))
+                    .mean();
+
+                for (x, z) in surrounding {
+                    if let Some(c) = self.get_mut(x, z) {
+                        c.height = height as f32;
+                        c.texture = TextureSections::Rock;
+                    }
+                }
             }
         }
     }
 
-    fn draw(&mut self, x: usize, z: usize, remaining: usize, t: TextureSections) {
-        if let Some(c) = self.get_mut(x, z) {
-            c.texture = t;
-        }
+    fn surrounding(&self, x: usize, z: usize, remaining: usize) -> HashSet<(usize, usize)> {
+        let mut r = HashSet::new();
+        r.insert((x, z));
+
         if remaining > 0 {
             for s in surrounding_indices(x, z) {
                 for s in s {
-                    self.draw(s.0, s.1, remaining - 1, t);
+                    r.insert(s);
+                    r.extend(self.surrounding(s.0, s.1, remaining - 1));
                 }
             }
         }
+        r
     }
 }
 
