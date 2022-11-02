@@ -1,7 +1,7 @@
 mod checkpoint;
 mod load_texture;
 mod noise;
-mod terrain;
+pub mod terrain;
 
 use bevy::{
     prelude::{shape::Cube, *},

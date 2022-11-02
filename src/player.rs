@@ -1,8 +1,15 @@
 use bevy::prelude::{shape::Icosphere, *};
 use bevy_rapier3d::prelude::*;
-use tokio::{runtime::Runtime, sync::mpsc::Receiver};
+use tokio::{
+    runtime::Runtime,
+    sync::mpsc::{Receiver, Sender},
+};
 
-use crate::{camera::FollowCamera, server::NextFrame, world::StartBlock};
+use crate::{
+    camera::FollowCamera,
+    server::{FrameState, NextFrame},
+    world::{terrain::Terrain, StartBlock},
+};
 
 pub struct PlayerPlugin {
     pub grpc: bool,
@@ -14,7 +21,8 @@ impl Plugin for PlayerPlugin {
             .add_system(setup_player)
             .add_system(sync_palyer_lights);
         if self.grpc {
-            app.add_system(player_input_grpc);
+            app.add_system(player_input_grpc)
+                .add_system(send_player_view_grpc);
         } else {
             app.add_system(player_debug_inputs);
         }
@@ -123,4 +131,17 @@ fn sync_palyer_lights(
             light_transform.translation = player_transform.translation + Vec3::Y * 10.0;
         }
     }
+}
+
+fn send_player_view_grpc(
+    runtime: Res<Runtime>,
+    state_sender: Res<Sender<FrameState>>,
+    _terrain: Res<Terrain>,
+    player_query: Query<&Transform, With<PlayerMarker>>,
+) {
+    runtime.block_on(async {
+        if let Some(_player_position) = player_query.iter().next() {
+            state_sender.send(FrameState {}).await.unwrap();
+        }
+    });
 }

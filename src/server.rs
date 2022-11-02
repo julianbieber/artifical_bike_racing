@@ -19,6 +19,7 @@ pub mod game {
         tonic::include_file_descriptor_set!("game_descriptor");
 }
 
+#[derive(Debug)]
 pub struct FrameState {}
 #[derive(Debug)]
 pub struct NextFrame {
