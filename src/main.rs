@@ -32,12 +32,19 @@ fn main() {
     let runtime = Runtime::new().unwrap();
     let (frame_sender, frame_reciever) = tokio::sync::mpsc::channel(1);
     let (next_sender, next_reciever) = tokio::sync::mpsc::channel(1);
+    let (shutdown_sender, shutdown_receiver) = tokio::sync::mpsc::channel(1);
 
     let history = Arc::new(Mutex::new(History {
         collected_checkpoints: Vec::with_capacity(256),
         total: 0,
     }));
-    let t = start_server(frame_reciever, next_sender, history.clone(), opt.port);
+    let t = start_server(
+        frame_reciever,
+        next_sender,
+        shutdown_sender,
+        history.clone(),
+        opt.port,
+    );
     let mut a = App::new();
     if opt.cont {
         a.insert_resource(WindowDescriptor {
@@ -50,6 +57,7 @@ fn main() {
         .insert_resource(history)
         .insert_resource(frame_sender)
         .insert_resource(runtime)
+        .insert_resource(shutdown_receiver)
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(WorldPlugin {})
@@ -58,15 +66,8 @@ fn main() {
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(LogDiagnosticsPlugin {
             ..Default::default()
-        })
-        .add_system(kill_system);
+        });
 
     a.run();
     t.join().unwrap();
-}
-
-fn kill_system(keys: Res<Input<KeyCode>>) {
-    if keys.just_pressed(KeyCode::Escape) {
-        std::process::exit(0);
-    }
 }

@@ -38,6 +38,7 @@ pub struct NextFrame {
 pub fn start_server(
     frame_receiver: Receiver<FrameState>,
     next_frame_sender: Sender<NextFrame>,
+    shutdown_sender: Sender<()>,
     history: Arc<std::sync::Mutex<History>>,
     port: i32,
 ) -> JoinHandle<()> {
@@ -53,6 +54,7 @@ pub fn start_server(
                 frame_receiver: Mutex::new(frame_receiver),
                 next_frame_sender,
                 history,
+                shutdown_sender,
             };
             println!("started server");
             let reflection = tonic_reflection::server::Builder::configure()
@@ -74,6 +76,7 @@ pub fn start_server(
 pub struct GameServer {
     pub frame_receiver: Mutex<Receiver<FrameState>>,
     pub next_frame_sender: Sender<NextFrame>,
+    pub shutdown_sender: Sender<()>,
     pub history: Arc<std::sync::Mutex<History>>,
 }
 
@@ -118,18 +121,22 @@ impl MainService for GameServer {
         Ok(Response::new(Empty {}))
     }
     async fn kill(&self, _r: Request<Empty>) -> Result<Response<Empty>, Status> {
-        std::process::exit(0);
+        let _ = self.shutdown_sender.send(()).await;
+        Ok(Response::new(Empty {}))
     }
     async fn get_score(&self, _r: Request<Empty>) -> Result<Response<Score>, Status> {
-        let history = self.history.lock().unwrap();
-        let status = Score {
-            timings: history
-                .collected_checkpoints
-                .iter()
-                .map(|h| h.1 as i64)
-                .collect(),
-            total: history.total,
+        let status = {
+            let history = self.history.lock().unwrap();
+            Score {
+                timings: history
+                    .collected_checkpoints
+                    .iter()
+                    .map(|h| h.1 as i64)
+                    .collect(),
+                total: history.total,
+            }
         };
+        let _ = self.shutdown_sender.send(()).await;
         Ok(Response::new(status))
     }
 }

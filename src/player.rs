@@ -1,5 +1,8 @@
+use std::{fs::OpenOptions, io::Write};
+
 use bevy::prelude::{shape::Icosphere, *};
 use bevy_rapier3d::prelude::*;
+use serde::{Deserialize, Serialize};
 use tokio::{
     runtime::Runtime,
     sync::mpsc::{Receiver, Sender},
@@ -15,10 +18,36 @@ pub struct PlayerPlugin {
     pub grpc: bool,
 }
 
+#[derive(Serialize, Deserialize)]
+struct PlayerMovement {
+    transforms: Vec<SerializableTransform>,
+}
+#[derive(Serialize, Deserialize)]
+struct SerializableTransform {
+    translation: [f32; 3],
+    rotation: [f32; 4],
+    scale: [f32; 3],
+}
+
+impl From<&Transform> for SerializableTransform {
+    fn from(t: &Transform) -> Self {
+        Self {
+            translation: t.translation.into(),
+            rotation: t.rotation.into(),
+            scale: t.scale.into(),
+        }
+    }
+}
+
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Initialized { is: false })
+            .insert_resource(PlayerMovement {
+                transforms: Vec::new(),
+            })
             .add_system(setup_player)
+            .add_system(kill_system)
+            .add_system(record_player_positions)
             .add_system(sync_palyer_lights);
         if self.grpc {
             app.add_system(player_input_grpc)
@@ -155,4 +184,32 @@ fn send_player_view_grpc(
                 .unwrap();
         }
     });
+}
+
+fn record_player_positions(
+    mut positions: ResMut<PlayerMovement>,
+    player_query: Query<&Transform, With<PlayerMarker>>,
+) {
+    if let Some(p) = player_query.iter().next() {
+        positions.transforms.push(p.into());
+    }
+}
+
+fn kill_system(
+    keys: Res<Input<KeyCode>>,
+    mut shutdown_receiver: ResMut<Receiver<()>>,
+    positions: Res<PlayerMovement>,
+) {
+    let receievd = shutdown_receiver.try_recv().is_ok();
+    if keys.just_pressed(KeyCode::Escape) || receievd {
+        let positions_json = serde_json::to_string(positions.into_inner()).unwrap();
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .append(false)
+            .open("todo.json")
+            .unwrap();
+        file.write_all(positions_json.as_bytes()).unwrap();
+        std::process::exit(0);
+    }
 }
