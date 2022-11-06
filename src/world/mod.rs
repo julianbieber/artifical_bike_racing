@@ -1,7 +1,9 @@
-mod checkpoint;
+pub mod checkpoint;
 pub mod load_texture;
 mod noise;
 pub mod terrain;
+
+use std::sync::{Arc, Mutex};
 
 use bevy::{
     prelude::{shape::Cube, *},
@@ -11,7 +13,9 @@ use bevy::{
 use bevy_rapier3d::prelude::*;
 
 use self::{
-    checkpoint::{checkpoint_collection, only_show_next_checkpoint, setup_checkpoints, History},
+    checkpoint::{
+        checkpoint_collection, only_show_next_checkpoint, setup_checkpoints, FrameCounter, History,
+    },
     load_texture::setup_texture_atlas,
     terrain::Terrain,
 };
@@ -20,17 +24,16 @@ pub struct WorldPlugin {}
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(History {
-            collected_checkpoints: Vec::with_capacity(256),
-        })
-        .add_system(checkpoint_collection)
-        .add_system(only_show_next_checkpoint)
-        .add_startup_system(setup_world);
+        app.insert_resource(FrameCounter { count: 0 })
+            .add_system(checkpoint_collection)
+            .add_system(only_show_next_checkpoint)
+            .add_startup_system(setup_world);
     }
 }
 
 fn setup_world(
     mut commands: Commands,
+    history: Res<Arc<Mutex<History>>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
@@ -41,6 +44,7 @@ fn setup_world(
         setup_start_cube(&mut commands, &terrain, &mut meshes, &mut materials);
     setup_checkpoints(
         &mut commands,
+        &history,
         &mut meshes,
         &mut materials,
         &mut terrain,

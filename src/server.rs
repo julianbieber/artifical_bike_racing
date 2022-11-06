@@ -1,6 +1,6 @@
-use std::thread::JoinHandle;
-
 use bevy::prelude::Vec3;
+use std::sync::Arc;
+use std::thread::JoinHandle;
 use tokio::{
     runtime::Runtime,
     sync::{
@@ -10,10 +10,12 @@ use tokio::{
 };
 use tonic::{transport::Server, Request, Response, Status};
 
-use crate::world::load_texture::TextureSections;
+use crate::world::{checkpoint::History, load_texture::TextureSections};
 
 use self::game::main_service_server::MainServiceServer;
-use self::game::{main_service_server::MainService, Empty, InputRequest, PlayerView, Terrain};
+use self::game::{
+    main_service_server::MainService, Empty, InputRequest, PlayerView, Score, Terrain,
+};
 
 pub mod game {
     #![allow(clippy::all)]
@@ -36,6 +38,7 @@ pub struct NextFrame {
 pub fn start_server(
     frame_receiver: Receiver<FrameState>,
     next_frame_sender: Sender<NextFrame>,
+    history: Arc<std::sync::Mutex<History>>,
     port: i32,
 ) -> JoinHandle<()> {
     std::thread::spawn(move || {
@@ -49,6 +52,7 @@ pub fn start_server(
             let game_server = GameServer {
                 frame_receiver: Mutex::new(frame_receiver),
                 next_frame_sender,
+                history,
             };
             println!("started server");
             let reflection = tonic_reflection::server::Builder::configure()
@@ -70,6 +74,7 @@ pub fn start_server(
 pub struct GameServer {
     pub frame_receiver: Mutex<Receiver<FrameState>>,
     pub next_frame_sender: Sender<NextFrame>,
+    pub history: Arc<std::sync::Mutex<History>>,
 }
 
 #[tonic::async_trait]
@@ -95,9 +100,7 @@ impl MainService for GameServer {
                         })
                     })
                     .collect(),
-                x: state.player.x,
                 y: state.player.y,
-                z: state.player.z,
             }))
         } else {
             Err(Status::not_found("no new game state available"))
@@ -116,5 +119,17 @@ impl MainService for GameServer {
     }
     async fn kill(&self, _r: Request<Empty>) -> Result<Response<Empty>, Status> {
         std::process::exit(0);
+    }
+    async fn get_score(&self, _r: Request<Empty>) -> Result<Response<Score>, Status> {
+        let history = self.history.lock().unwrap();
+        let status = Score {
+            timings: history
+                .collected_checkpoints
+                .iter()
+                .map(|h| h.1 as i64)
+                .collect(),
+            total: history.total,
+        };
+        Ok(Response::new(status))
     }
 }

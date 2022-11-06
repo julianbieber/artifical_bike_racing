@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use bevy::math::Affine2;
 use bevy::prelude::{shape::Icosphere, *};
 use bevy::render::view::NoFrustumCulling;
@@ -15,24 +17,27 @@ pub struct Checkpoint {
     number: u8,
 }
 pub struct History {
-    pub collected_checkpoints: Vec<u8>,
+    pub total: i32,
+    pub collected_checkpoints: Vec<(u8, usize)>,
 }
 impl History {
     fn next(&self) -> u8 {
         self.collected_checkpoints
             .last()
-            .map(|l| l + 1)
+            .map(|l| l.0 + 1)
             .unwrap_or(0)
     }
 }
 
 pub fn setup_checkpoints(
     commands: &mut Commands,
+    history: &Arc<Mutex<History>>,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     terrain: &mut Terrain,
     start_cube: Vec3,
 ) {
+    let mut history = history.lock().unwrap();
     let material = materials.add(StandardMaterial {
         base_color: Color::rgba(0.0, 0.5, 0.0, 0.5),
         alpha_mode: AlphaMode::Blend,
@@ -54,6 +59,7 @@ pub fn setup_checkpoints(
     let mut track_with_start = vec![Vec2::new(start_cube.x, start_cube.z)];
     track_with_start.extend(track.iter());
     terrain.register_road(&track_with_start);
+    history.total = track_with_start.len() as i32;
     for (i, c) in track.into_iter().enumerate() {
         if let Some(height) = terrain.get_height(c.x, c.y) {
             spawn_checkpoint(
@@ -99,21 +105,30 @@ fn spawn_checkpoint(
         });
 }
 
+pub struct FrameCounter {
+    pub count: usize,
+}
+
 pub fn checkpoint_collection(
     mut commands: Commands,
-    mut history: ResMut<History>,
+    history: ResMut<Arc<Mutex<History>>>,
+    mut frame_counter: ResMut<FrameCounter>,
     mut collision_events: EventReader<CollisionEvent>,
     checkpoints: Query<&Checkpoint>,
     player_query: Query<Entity, With<PlayerMarker>>,
 ) {
     if let Some(player) = player_query.iter().next() {
+        frame_counter.count += 1;
+        let mut history = history.lock().unwrap();
         for e in collision_events.iter() {
             match e {
                 CollisionEvent::Started(e1, e2, _) if *e1 == player => {
                     if let Ok(checkpoint) = checkpoints.get(*e2) {
                         if checkpoint.number == history.next() {
                             commands.entity(*e2).despawn_recursive();
-                            history.collected_checkpoints.push(checkpoint.number);
+                            history
+                                .collected_checkpoints
+                                .push((checkpoint.number, frame_counter.count));
                         }
                     }
                 }
@@ -121,7 +136,9 @@ pub fn checkpoint_collection(
                     if let Ok(checkpoint) = checkpoints.get(*e1) {
                         if checkpoint.number == history.next() {
                             commands.entity(*e1).despawn_recursive();
-                            history.collected_checkpoints.push(checkpoint.number);
+                            history
+                                .collected_checkpoints
+                                .push((checkpoint.number, frame_counter.count));
                         }
                     }
                 }
@@ -133,9 +150,9 @@ pub fn checkpoint_collection(
 
 pub fn only_show_next_checkpoint(
     mut checkpoints: Query<(&mut Visibility, &Checkpoint)>,
-    history: Res<History>,
+    history: Res<Arc<Mutex<History>>>,
 ) {
-    let next = history.next();
+    let next = history.lock().unwrap().next();
     for (mut v, c) in checkpoints.iter_mut() {
         v.is_visible = c.number == next;
     }

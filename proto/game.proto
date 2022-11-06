@@ -7,6 +7,7 @@ service MainService {
   rpc getState(Empty) returns (PlayerView);
   rpc input(InputRequest) returns (Empty);
   rpc kill(Empty) returns (Empty);
+  rpc getScore(Empty) returns (Score);
 }
 
 message Empty {}
@@ -18,13 +19,16 @@ message InputRequest {
 
 message PlayerView {
   repeated Terrain surrounding = 1;
-  float x = 2;
-  float y = 3;
-  float z = 4;
+  float y = 2;
   
 }
 
 message Terrain {
   float height = 1;
   int32 kind = 2;
+}
+
+message Score {
+  repeated int64 timings = 1;
+  int32 total = 2;
 }
