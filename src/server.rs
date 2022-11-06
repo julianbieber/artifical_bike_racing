@@ -1,5 +1,6 @@
 use std::thread::JoinHandle;
 
+use bevy::prelude::Vec3;
 use tokio::{
     runtime::Runtime,
     sync::{
@@ -9,8 +10,10 @@ use tokio::{
 };
 use tonic::{transport::Server, Request, Response, Status};
 
+use crate::world::load_texture::TextureSections;
+
 use self::game::main_service_server::MainServiceServer;
-use self::game::{main_service_server::MainService, Empty, InputRequest};
+use self::game::{main_service_server::MainService, Empty, InputRequest, PlayerView, Terrain};
 
 pub mod game {
     #![allow(clippy::all)]
@@ -20,7 +23,10 @@ pub mod game {
 }
 
 #[derive(Debug)]
-pub struct FrameState {}
+pub struct FrameState {
+    pub surrounding: Vec<Option<(TextureSections, f32)>>,
+    pub player: Vec3,
+}
 #[derive(Debug)]
 pub struct NextFrame {
     pub x: f32,
@@ -71,10 +77,28 @@ impl MainService for GameServer {
     async fn health(&self, _r: Request<Empty>) -> Result<Response<Empty>, Status> {
         Ok(Response::new(Empty {}))
     }
-    async fn get_state(&self, _r: Request<Empty>) -> Result<Response<Empty>, Status> {
+    async fn get_state(&self, _r: Request<Empty>) -> Result<Response<PlayerView>, Status> {
         let mut receievr = self.frame_receiver.lock().await;
-        if let Some(_state) = receievr.recv().await {
-            Ok(Response::new(Empty {}))
+        if let Some(state) = receievr.recv().await {
+            Ok(Response::new(PlayerView {
+                surrounding: state
+                    .surrounding
+                    .iter()
+                    .map(|p| {
+                        p.map(|p| Terrain {
+                            height: p.1,
+                            kind: p.0 as i32,
+                        })
+                        .unwrap_or(Terrain {
+                            height: 0.0,
+                            kind: -1,
+                        })
+                    })
+                    .collect(),
+                x: state.player.x,
+                y: state.player.y,
+                z: state.player.z,
+            }))
         } else {
             Err(Status::not_found("no new game state available"))
         }

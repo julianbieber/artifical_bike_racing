@@ -136,12 +136,23 @@ fn sync_palyer_lights(
 fn send_player_view_grpc(
     runtime: Res<Runtime>,
     state_sender: Res<Sender<FrameState>>,
-    _terrain: Res<Terrain>,
+    terrain: Res<Terrain>,
     player_query: Query<&Transform, With<PlayerMarker>>,
 ) {
     runtime.block_on(async {
-        if let Some(_player_position) = player_query.iter().next() {
-            state_sender.send(FrameState {}).await.unwrap();
+        if let Some(player_position) = player_query.iter().next() {
+            let surrounding = terrain
+                .get_heights_around(player_position.translation.x, player_position.translation.z)
+                .into_iter()
+                .map(|q| q.map(|q| (q.texture, q.height)))
+                .collect();
+            state_sender
+                .send(FrameState {
+                    surrounding,
+                    player: player_position.translation,
+                })
+                .await
+                .unwrap();
         }
     });
 }

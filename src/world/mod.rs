@@ -1,5 +1,5 @@
 mod checkpoint;
-mod load_texture;
+pub mod load_texture;
 mod noise;
 pub mod terrain;
 

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::texture::{create_texture, Atlas, PbrImages};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum TextureSections {
     Grass,
     Grass2,

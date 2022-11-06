@@ -4,7 +4,6 @@ use super::load_texture::TextureSections;
 use bevy::{
     prelude::*,
     render::{mesh::Indices, render_resource::PrimitiveTopology},
-    utils::HashSet,
 };
 use bevy_rapier3d::prelude::Collider;
 use statrs::statistics::Statistics;
@@ -52,10 +51,11 @@ impl Terrain {
         let mut indices = Vec::with_capacity(self.quads.len() * self.quads.len() * 6);
         let mut current_index = 0;
 
-        for (x, quads) in self.quads.iter().enumerate() {
-            for (z, quad) in quads.iter().enumerate() {
-                let s = surrounding_indices(x, z)
-                    .map(|row| row.map(|(x1, z1)| self.get(x1, z1).map(|q| q.height)));
+        for (z, quads) in self.quads.iter().enumerate() {
+            for (x, quad) in quads.iter().enumerate() {
+                let s = self
+                    .surrounding_indices(x, z)
+                    .map(|row| row.map(|index| index.map(|(x1, z1)| self.get(x1, z1).height)));
                 let (world_x, world_z) = self.index_to_world(x, z);
                 let (p, n) = quad.to_positions_and_normals(world_x, world_z, &s);
                 positions.extend(p);
@@ -89,8 +89,20 @@ impl Terrain {
     }
 
     pub fn get_height(&self, x: f32, z: f32) -> Option<f32> {
-        let (x, z) = self.world_to_index(x, z);
-        self.get(x, z).map(|q| q.height)
+        self.world_to_index(x, z)
+            .map(|(x, z)| self.get(x, z).height)
+    }
+
+    pub fn get_heights_around(&self, x: f32, z: f32) -> Vec<Option<Quad>> {
+        if let Some(indices) = self.world_to_index(x, z) {
+            self.surrounding(indices.0, indices.1, 4)
+                .into_iter()
+                .flatten()
+                .map(|i| i.map(|i| self.get(i.0, i.1).clone()))
+                .collect()
+        } else {
+            vec![None; 25]
+        }
     }
 
     pub fn get_dimensions(&self) -> (Vec2, Vec2) {
@@ -100,22 +112,22 @@ impl Terrain {
         )
     }
 
-    fn get(&self, x: usize, z: usize) -> Option<&Quad> {
-        self.quads.get(x).and_then(|q| q.get(z))
+    fn get(&self, x: usize, z: usize) -> &Quad {
+        self.quads.get(z).and_then(|q| q.get(x)).unwrap()
     }
-    fn get_mut(&mut self, x: usize, z: usize) -> Option<&mut Quad> {
-        self.quads.get_mut(x).and_then(|q| q.get_mut(z))
+    fn get_mut(&mut self, x: usize, z: usize) -> &mut Quad {
+        self.quads.get_mut(z).and_then(|q| q.get_mut(x)).unwrap()
     }
 
     fn index_to_world(&self, x: usize, z: usize) -> (f32, f32) {
         (x as f32 - self.size / 2.0, z as f32 - self.size / 2.0)
     }
 
-    fn world_to_index(&self, x: f32, z: f32) -> (usize, usize) {
-        (
+    fn world_to_index(&self, x: f32, z: f32) -> Option<(usize, usize)> {
+        self.validate((
             (x + self.size / 2.0) as usize,
             (z + self.size / 2.0) as usize,
-        )
+        ))
     }
 
     pub fn register_road(&mut self, points: &[Vec2]) {
@@ -123,15 +135,17 @@ impl Terrain {
             let start = window[0];
             let end = window[1];
             for p in between(end, start, self.size / (self.quads.len() as f32)) {
-                let (x, z) = self.world_to_index(p.x, p.y);
-                let surrounding = self.surrounding(x, z, 3);
-                let height = surrounding
-                    .iter()
-                    .flat_map(|i| self.get(i.0, i.1).map(|c| c.height as f64))
-                    .mean();
+                if let Some((x, z)) = self.world_to_index(p.x, p.y) {
+                    let surrounding = self.surrounding(x, z, 3);
+                    let height = surrounding
+                        .iter()
+                        .flatten()
+                        .flatten()
+                        .map(|i| (self.get(i.0, i.1).height) as f64)
+                        .mean();
 
-                for (x, z) in surrounding {
-                    if let Some(c) = self.get_mut(x, z) {
+                    for (x, z) in surrounding.iter().flatten().flatten() {
+                        let mut c = self.get_mut(*x, *z);
                         c.height = height as f32;
                         c.texture = TextureSections::Rock;
                     }
@@ -140,19 +154,53 @@ impl Terrain {
         }
     }
 
-    fn surrounding(&self, x: usize, z: usize, remaining: usize) -> HashSet<(usize, usize)> {
-        let mut r = HashSet::new();
-        r.insert((x, z));
+    /// radius of  2 == 5x5 matrix
+    fn surrounding(&self, x: usize, z: usize, radius: isize) -> Vec<Vec<Option<(usize, usize)>>> {
+        (-radius..=radius)
+            .map(|z_offset| {
+                (-radius..=radius)
+                    .map(|x_offset| {
+                        self.left_right((x, z), x_offset)
+                            .and_then(|v| self.up_down(v, z_offset))
+                    })
+                    .collect()
+            })
+            .collect()
+    }
 
-        if remaining > 0 {
-            for s in surrounding_indices(x, z) {
-                for s in s {
-                    r.insert(s);
-                    r.extend(self.surrounding(s.0, s.1, remaining - 1));
-                }
-            }
+    fn surrounding_indices(&self, x: usize, z: usize) -> [[Option<(usize, usize)>; 3]; 3] {
+        [
+            [
+                self.validate((x - 1, z - 1)),
+                self.validate((x, z - 1)),
+                self.validate((x + 1, z - 1)),
+            ],
+            [
+                self.validate((x - 1, z)),
+                self.validate((x, z)),
+                self.validate((x + 1, z)),
+            ],
+            [
+                self.validate((x - 1, z + 1)),
+                self.validate((x, z + 1)),
+                self.validate((x + 1, z + 1)),
+            ],
+        ]
+    }
+
+    fn left_right(&self, index: (usize, usize), steps: isize) -> Option<(usize, usize)> {
+        self.validate((((index.0 as isize) + steps) as usize, index.1))
+    }
+    fn up_down(&self, index: (usize, usize), steps: isize) -> Option<(usize, usize)> {
+        self.validate((index.0, ((index.1 as isize) + steps) as usize))
+    }
+
+    fn validate(&self, index: (usize, usize)) -> Option<(usize, usize)> {
+        if index.0 >= self.size as usize || index.1 >= self.size as usize {
+            None
+        } else {
+            Some(index)
         }
-        r
     }
 }
 
@@ -163,17 +211,10 @@ fn between(start: Vec2, end: Vec2, step: f32) -> Vec<Vec2> {
     (0..steps).map(|i| start + direction * i as f32).collect()
 }
 
-fn surrounding_indices(x: usize, z: usize) -> [[(usize, usize); 3]; 3] {
-    [
-        [(x - 1, z - 1), (x, z - 1), (x + 1, z - 1)],
-        [(x - 1, z), (x, z), (x + 1, z)],
-        [(x - 1, z + 1), (x, z + 1), (x + 1, z + 1)],
-    ]
-}
-
-struct Quad {
-    height: f32,
-    texture: TextureSections,
+#[derive(Clone)]
+pub struct Quad {
+    pub height: f32,
+    pub texture: TextureSections,
     scale: f32,
 }
 impl Quad {
