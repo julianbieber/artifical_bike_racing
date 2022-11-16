@@ -3,7 +3,11 @@ pub mod load_texture;
 mod noise;
 pub mod terrain;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use bevy::{
     prelude::{shape::Cube, *},
@@ -11,6 +15,8 @@ use bevy::{
 };
 
 use bevy_rapier3d::prelude::*;
+
+use crate::player::setup_player;
 
 use self::{
     checkpoint::{
@@ -33,15 +39,23 @@ impl Plugin for WorldPlugin {
 
 fn setup_world(
     mut commands: Commands,
-    history: Res<Arc<Mutex<History>>>,
+    history: Res<Arc<Mutex<HashMap<Entity, History>>>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
+    player_recordings: Res<Vec<PathBuf>>,
 ) {
     let atlas = setup_texture_atlas(&mut images);
     let mut terrain = Terrain::new(430, 1.0);
     let start_cube_position =
         setup_start_cube(&mut commands, &terrain, &mut meshes, &mut materials);
+    let players = setup_player(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &player_recordings,
+        start_cube_position,
+    );
     setup_checkpoints(
         &mut commands,
         &history,
@@ -49,6 +63,7 @@ fn setup_world(
         &mut materials,
         &mut terrain,
         start_cube_position,
+        &players,
     );
     let (mesh, collider) = terrain.to_mesh(&atlas);
     commands.insert_resource(terrain);
@@ -68,7 +83,7 @@ fn setup_start_cube(
     terrain: &Terrain,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
-) -> Vec3 {
+) -> (Vec3, f32) {
     let (_min, max) = dbg!(terrain.get_dimensions());
     if let Some(edge_height) = terrain.get_height(0.0, dbg!(max.y - 1.0)) {
         let cube_position = Vec3::new(0.0, edge_height - 2.0, max.y);
@@ -82,17 +97,11 @@ fn setup_start_cube(
                 }),
                 ..Default::default()
             })
-            .insert(StartBlock { size: 4.0 })
             .insert(RigidBody::Fixed)
             .insert(NoFrustumCulling {})
             .insert(Collider::cuboid(2.0, 2.0, 2.0));
-        cube_position
+        (cube_position, 4.0)
     } else {
         panic!("cound not palce start block");
     }
-}
-
-#[derive(Component)]
-pub struct StartBlock {
-    pub size: f32,
 }

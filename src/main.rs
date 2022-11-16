@@ -1,4 +1,8 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
@@ -19,12 +23,15 @@ mod server;
 mod texture;
 mod world;
 
-#[derive(Parser, Copy, Clone, Debug)]
+#[derive(Parser, Clone, Debug)]
 struct Opt {
     #[arg(long)]
     port: i32,
     #[arg(long)]
     cont: bool,
+    #[arg(long)]
+    /// singular to make the cli more intuitive
+    recording: Vec<PathBuf>,
 }
 
 fn main() {
@@ -34,10 +41,9 @@ fn main() {
     let (next_sender, next_reciever) = tokio::sync::mpsc::channel(1);
     let (shutdown_sender, shutdown_receiver) = tokio::sync::mpsc::channel(1);
 
-    let history = Arc::new(Mutex::new(History {
-        collected_checkpoints: Vec::with_capacity(256),
-        total: 0,
-    }));
+    let history = Arc::new(Mutex::new(HashMap::<Entity, History>::with_capacity(
+        opt.recording.len() + 1,
+    )));
     let t = start_server(
         frame_reciever,
         next_sender,
@@ -62,7 +68,10 @@ fn main() {
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(WorldPlugin {})
         .add_plugin(CameraPlugin { active: opt.cont })
-        .add_plugin(PlayerPlugin { grpc: !opt.cont })
+        .add_plugin(PlayerPlugin {
+            grpc: !opt.cont,
+            recording_paths: opt.recording,
+        })
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(LogDiagnosticsPlugin {
             ..Default::default()

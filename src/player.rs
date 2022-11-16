@@ -1,6 +1,9 @@
-use std::{fs::OpenOptions, io::Write};
+use std::{fs::OpenOptions, io::Write, path::PathBuf};
 
-use bevy::prelude::{shape::Icosphere, *};
+use bevy::{
+    prelude::{shape::Icosphere, *},
+    render::view::NoFrustumCulling,
+};
 use bevy_rapier3d::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -11,11 +14,12 @@ use tokio::{
 use crate::{
     camera::FollowCamera,
     server::{FrameState, NextFrame},
-    world::{terrain::Terrain, StartBlock},
+    world::terrain::Terrain,
 };
 
 pub struct PlayerPlugin {
     pub grpc: bool,
+    pub recording_paths: Vec<PathBuf>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -41,86 +45,131 @@ impl From<&Transform> for SerializableTransform {
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(Initialized { is: false })
-            .insert_resource(PlayerMovement {
-                transforms: Vec::new(),
-            })
-            .add_system(setup_player)
-            .add_system(kill_system)
-            .add_system(record_player_positions)
-            .add_system(sync_palyer_lights);
+        app.insert_resource(PlayerMovement {
+            transforms: Vec::new(),
+        })
+        .insert_resource(self.recording_paths.clone())
+        .add_system(kill_system)
+        .add_system(record_player_positions)
+        .add_system(sync_palyer_lights)
+        .add_system(swap_camera);
         if self.grpc {
             app.add_system(player_input_grpc)
                 .add_system(send_player_view_grpc);
-        } else {
+        } else if self.recording_paths.is_empty() {
             app.add_system(player_debug_inputs);
+        } else {
+            app.add_system(movement_playback);
         }
     }
 }
 
-struct Initialized {
-    is: bool,
+pub fn setup_player(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    paths: &[PathBuf],
+    start_block: (Vec3, f32),
+) -> Vec<Entity> {
+    let recordings = read_recordings(paths);
+    if recordings.is_empty() {
+        vec![spawn_player(
+            commands,
+            meshes,
+            materials,
+            start_block,
+            Vec::new(),
+            0,
+        )]
+    } else {
+        recordings
+            .into_iter()
+            .enumerate()
+            .map(|(i, r)| spawn_player(commands, meshes, materials, start_block, r.transforms, i))
+            .collect()
+    }
 }
 
-fn setup_player(
-    mut initialized: ResMut<Initialized>,
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    start_block_query: Query<(&Transform, &StartBlock)>,
-) {
-    if !initialized.is {
-        if let Some((start_block_transform, start_block)) = start_block_query.iter().next() {
-            initialized.is = true;
-            /* Create the bouncing ball. */
-            let player_entity = commands
-                .spawn_bundle(PbrBundle {
-                    mesh: meshes.add(
-                        Icosphere {
-                            radius: 0.5,
-                            subdivisions: 5,
-                        }
-                        .into(),
-                    ),
-                    material: materials.add(StandardMaterial {
-                        ..Default::default()
-                    }),
-                    transform: Transform::from_translation(
-                        start_block_transform.translation + Vec3::Y * start_block.size,
-                    ),
-                    ..Default::default()
-                })
-                .insert(RigidBody::Dynamic)
-                .insert(Collider::ball(0.5))
-                .insert(Restitution::coefficient(0.7))
-                .insert(FollowCamera { follows: true })
-                .insert(ExternalForce {
-                    force: Vec3::ZERO,
-                    torque: Vec3::ZERO,
-                })
-                .insert(PlayerMarker {})
-                .insert(ActiveEvents::COLLISION_EVENTS)
-                .id();
-            commands
-                .spawn_bundle(PointLightBundle {
-                    point_light: PointLight {
-                        intensity: 15000.0,
-                        radius: 100.0,
-                        shadows_enabled: true,
-                        ..default()
-                    },
-                    transform: Transform::from_xyz(2.0, 22.0, 50.0),
-                    ..default()
-                })
-                .insert(PlayerLight {
-                    player: player_entity,
-                });
-        }
-    }
+fn spawn_player(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    start_block_transform: (Vec3, f32),
+    playback: Vec<SerializableTransform>,
+    index: usize,
+) -> Entity {
+    let playback_len = playback.len();
+    /* Create the bouncing ball. */
+    let mut player_entity = commands.spawn_bundle(PbrBundle {
+        mesh: meshes.add(
+            Icosphere {
+                radius: 0.5,
+                subdivisions: 5,
+            }
+            .into(),
+        ),
+        material: materials.add(StandardMaterial {
+            ..Default::default()
+        }),
+        transform: Transform::from_translation(
+            start_block_transform.0 + Vec3::Y * start_block_transform.1,
+        ),
+        ..Default::default()
+    });
+    player_entity
+        .insert(NoFrustumCulling {})
+        .insert(FollowCamera {
+            follows: index == 0,
+        })
+        .insert(ExternalForce {
+            force: Vec3::ZERO,
+            torque: Vec3::ZERO,
+        })
+        .insert(PlayerMarker {
+            playback_recording: playback,
+            playback_position: 0,
+            index,
+            name: "TODO name".into(),
+        });
+    let player_entity = if playback_len == 0 {
+        player_entity
+            .insert(RigidBody::Dynamic)
+            .insert(Collider::ball(0.5))
+            .insert(Restitution::coefficient(0.7))
+            .insert(ActiveEvents::COLLISION_EVENTS)
+            .id()
+    } else {
+        player_entity
+            .insert(Sensor)
+            .insert(RigidBody::Dynamic)
+            .insert(Collider::ball(0.5))
+            .insert(ActiveEvents::COLLISION_EVENTS)
+            .id()
+    };
+    commands
+        .spawn_bundle(PointLightBundle {
+            point_light: PointLight {
+                intensity: 15000.0,
+                radius: 100.0,
+                shadows_enabled: true,
+                ..default()
+            },
+            transform: Transform::from_xyz(2.0, 22.0, 50.0),
+            ..default()
+        })
+        .insert(PlayerLight {
+            player: player_entity,
+        });
+    player_entity
 }
 
 #[derive(Component)]
-pub struct PlayerMarker {}
+pub struct PlayerMarker {
+    pub name: String,
+    playback_recording: Vec<SerializableTransform>,
+    playback_position: usize,
+    index: usize,
+}
 #[derive(Component)]
 struct PlayerLight {
     player: Entity,
@@ -207,9 +256,56 @@ fn kill_system(
             .create(true)
             .write(true)
             .append(false)
+            .truncate(true)
             .open("todo.json")
             .unwrap();
         file.write_all(positions_json.as_bytes()).unwrap();
         std::process::exit(0);
+    }
+}
+
+fn read_recordings(paths: &[PathBuf]) -> Vec<PlayerMovement> {
+    paths
+        .iter()
+        .map(|path| {
+            let j = std::fs::read_to_string(path).unwrap();
+            serde_json::from_str(&j).unwrap()
+        })
+        .collect()
+}
+
+fn movement_playback(mut players_q: Query<(&mut Transform, &mut PlayerMarker)>) {
+    for (mut t, mut p) in players_q.iter_mut() {
+        if let Some(next) = p
+            .playback_recording
+            .get(p.playback_position)
+            .or_else(|| p.playback_recording.last())
+        {
+            t.translation = next.translation.into();
+            t.rotation = Quat::from_array(next.rotation);
+            t.scale = next.scale.into();
+            p.playback_position += 1;
+        }
+    }
+}
+
+fn swap_camera(keys: Res<Input<KeyCode>>, mut players: Query<(&mut FollowCamera, &PlayerMarker)>) {
+    if keys.just_pressed(KeyCode::Right) {
+        let player_count = players.iter().count();
+        if let Some(current_follow) = players.iter().find(|p| p.0.follows) {
+            let next = (current_follow.1.index + 1) % player_count;
+            players
+                .iter_mut()
+                .for_each(|mut p| p.0.follows = p.1.index == next);
+        }
+    }
+    if keys.just_pressed(KeyCode::Left) {
+        let player_count = players.iter().count();
+        if let Some(current_follow) = players.iter().find(|p| p.0.follows) {
+            let next = (current_follow.1.index - 1) % player_count;
+            players
+                .iter_mut()
+                .for_each(|mut p| p.0.follows = p.1.index == next);
+        }
     }
 }

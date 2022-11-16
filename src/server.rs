@@ -1,6 +1,6 @@
-use bevy::prelude::Vec3;
-use std::sync::Arc;
+use bevy::prelude::{Entity, Vec3};
 use std::thread::JoinHandle;
+use std::{collections::HashMap, sync::Arc};
 use tokio::{
     runtime::Runtime,
     sync::{
@@ -39,7 +39,7 @@ pub fn start_server(
     frame_receiver: Receiver<FrameState>,
     next_frame_sender: Sender<NextFrame>,
     shutdown_sender: Sender<()>,
-    history: Arc<std::sync::Mutex<History>>,
+    history: Arc<std::sync::Mutex<HashMap<Entity, History>>>,
     port: i32,
 ) -> JoinHandle<()> {
     std::thread::spawn(move || {
@@ -77,7 +77,7 @@ pub struct GameServer {
     pub frame_receiver: Mutex<Receiver<FrameState>>,
     pub next_frame_sender: Sender<NextFrame>,
     pub shutdown_sender: Sender<()>,
-    pub history: Arc<std::sync::Mutex<History>>,
+    pub history: Arc<std::sync::Mutex<HashMap<Entity, History>>>,
 }
 
 #[tonic::async_trait]
@@ -126,14 +126,19 @@ impl MainService for GameServer {
     }
     async fn get_score(&self, _r: Request<Empty>) -> Result<Response<Score>, Status> {
         let status = {
-            let history = self.history.lock().unwrap();
-            Score {
-                timings: history
-                    .collected_checkpoints
-                    .iter()
-                    .map(|h| h.1 as i64)
-                    .collect(),
-                total: history.total,
+            if let Some((_, history)) = self.history.lock().unwrap().iter().next() {
+                Score {
+                    timings: history
+                        .collected_checkpoints
+                        .iter()
+                        .map(|h| h.1 as i64)
+                        .collect(),
+                    total: history.total,
+                }
+            } else {
+                return Err(Status::unknown(
+                    "there is no player to retrieve a score for",
+                ));
             }
         };
         let _ = self.shutdown_sender.send(()).await;
