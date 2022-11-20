@@ -260,18 +260,21 @@ fn kill_system(
     keys: Res<Input<KeyCode>>,
     mut shutdown_receiver: ResMut<Receiver<()>>,
     positions: Res<PlayerMovement>,
+    save_path: Res<Option<PathBuf>>,
 ) {
     let receievd = shutdown_receiver.try_recv().is_ok();
     if keys.just_pressed(KeyCode::Escape) || receievd {
-        let positions_json = serde_json::to_string(positions.into_inner()).unwrap();
-        let mut file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .append(false)
-            .truncate(true)
-            .open("todo.json")
-            .unwrap();
-        file.write_all(positions_json.as_bytes()).unwrap();
+        if let Some(save_path) = save_path.into_inner() {
+            let positions_json = serde_json::to_string(positions.into_inner()).unwrap();
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(false)
+                .truncate(true)
+                .open(save_path)
+                .unwrap();
+            file.write_all(positions_json.as_bytes()).unwrap();
+        };
         std::process::exit(0);
     }
 }

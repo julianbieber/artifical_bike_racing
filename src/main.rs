@@ -32,6 +32,8 @@ struct Opt {
     #[arg(long)]
     /// singular to make the cli more intuitive
     recording: Vec<PathBuf>,
+    #[arg(long)]
+    save: Option<PathBuf>,
 }
 
 fn main() {
@@ -64,6 +66,7 @@ fn main() {
         .insert_resource(frame_sender)
         .insert_resource(runtime)
         .insert_resource(shutdown_receiver)
+        .insert_resource(opt.save)
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(WorldPlugin {})
