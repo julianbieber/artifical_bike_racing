@@ -159,7 +159,7 @@ pub fn checkpoint_collection(
 ) {
     let collision_events: Vec<CollisionEvent> = collision_events.iter().cloned().collect();
     let players: HashSet<Entity> = player_query.iter().map(|v| v.0).collect();
-    if players.is_empty() {
+    if !players.is_empty() {
         frame_counter.count += 1;
         let mut history = history.lock().unwrap();
         for e in collision_events.iter() {
