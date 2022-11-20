@@ -155,6 +155,7 @@ fn spawn_player(
         player_entity
             .insert(Sensor)
             .insert(RigidBody::Dynamic)
+            .insert(GravityScale(0.0))
             .insert(Collider::ball(0.5))
             .insert(ActiveEvents::COLLISION_EVENTS)
             .id()
