@@ -80,12 +80,23 @@ pub fn setup_player(
             start_block,
             Vec::new(),
             0,
+            "self".into(),
         )]
     } else {
         recordings
             .into_iter()
             .enumerate()
-            .map(|(i, r)| spawn_player(commands, meshes, materials, start_block, r.transforms, i))
+            .map(|(i, r)| {
+                spawn_player(
+                    commands,
+                    meshes,
+                    materials,
+                    start_block,
+                    r.1.transforms,
+                    i,
+                    r.0,
+                )
+            })
             .collect()
     }
 }
@@ -97,6 +108,7 @@ fn spawn_player(
     start_block_transform: (Vec3, f32),
     playback: Vec<SerializableTransform>,
     index: usize,
+    name: String,
 ) -> Entity {
     let playback_len = playback.len();
     /* Create the bouncing ball. */
@@ -129,7 +141,7 @@ fn spawn_player(
             playback_recording: playback,
             playback_position: 0,
             index,
-            name: "TODO name".into(),
+            name,
         });
     let player_entity = if playback_len == 0 {
         player_entity
@@ -264,12 +276,15 @@ fn kill_system(
     }
 }
 
-fn read_recordings(paths: &[PathBuf]) -> Vec<PlayerMovement> {
+fn read_recordings(paths: &[PathBuf]) -> Vec<(String, PlayerMovement)> {
     paths
         .iter()
         .map(|path| {
             let j = std::fs::read_to_string(path).unwrap();
-            serde_json::from_str(&j).unwrap()
+            (
+                path.file_name().unwrap().to_string_lossy().into(),
+                serde_json::from_str(&j).unwrap(),
+            )
         })
         .collect()
 }
