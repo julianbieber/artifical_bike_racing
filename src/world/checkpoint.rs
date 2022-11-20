@@ -155,7 +155,7 @@ pub fn checkpoint_collection(
     mut frame_counter: ResMut<FrameCounter>,
     mut collision_events: EventReader<CollisionEvent>,
     mut checkpoints: Query<(Entity, &mut Checkpoint)>,
-    player_query: Query<(Entity, &PlayerMarker)>,
+    mut player_query: Query<(Entity, &mut PlayerMarker)>,
 ) {
     let collision_events: Vec<CollisionEvent> = collision_events.iter().cloned().collect();
     let players: HashSet<Entity> = player_query.iter().map(|v| v.0).collect();
@@ -171,7 +171,7 @@ pub fn checkpoint_collection(
                         &mut history,
                         &mut checkpoints,
                         frame_counter.count,
-                        &player_query,
+                        &mut player_query,
                     );
                 }
                 CollisionEvent::Started(e1, e2, _) if players.contains(e2) => {
@@ -181,7 +181,7 @@ pub fn checkpoint_collection(
                         &mut history,
                         &mut checkpoints,
                         frame_counter.count,
-                        &player_query,
+                        &mut player_query,
                     );
                 }
                 _ => (),
@@ -198,24 +198,30 @@ pub fn checkpoint_collection(
 fn collect_cp(
     player_entity: Entity,
     cp_entity: Entity,
-    history: &mut HashMap<Entity, History>,
+    histories: &mut HashMap<Entity, History>,
     checkpoints: &mut Query<(Entity, &mut Checkpoint)>,
     frame_counter: usize,
-    player_query: &Query<(Entity, &PlayerMarker)>,
+    player_query: &mut Query<(Entity, &mut PlayerMarker)>,
 ) {
     if let Ok((_, mut checkpoint)) = checkpoints.get_mut(cp_entity) {
-        let history = history.get_mut(&player_entity).unwrap();
+        let number_of_players = histories.len();
+        let history = histories.get_mut(&player_entity).unwrap();
         if checkpoint.number == history.next() {
-            checkpoint.remaining_players.retain(|e| *e != cp_entity);
+            checkpoint.remaining_players.retain(|e| *e != player_entity);
             history
                 .collected_checkpoints
                 .push((checkpoint.number, frame_counter));
+
+            let mut player = player_query.get_mut(player_entity).unwrap().1;
+            player.current_position = Some(number_of_players - checkpoint.remaining_players.len());
+
             if history.finished() {
-                let player = player_query.get(player_entity).unwrap().1;
                 dbg!(
                     &player.name,
                     "finished the track after",
-                    Duration::from_millis(frame_counter as u64 * 16)
+                    Duration::from_millis(frame_counter as u64 * 16),
+                    "on position",
+                    player.current_position
                 );
             }
         }

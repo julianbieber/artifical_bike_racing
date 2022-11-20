@@ -142,6 +142,7 @@ fn spawn_player(
             playback_position: 0,
             index,
             name,
+            current_position: None,
         });
     let player_entity = if playback_len == 0 {
         player_entity
@@ -181,6 +182,7 @@ pub struct PlayerMarker {
     playback_recording: Vec<SerializableTransform>,
     playback_position: usize,
     index: usize,
+    pub current_position: Option<usize>,
 }
 #[derive(Component)]
 struct PlayerLight {
