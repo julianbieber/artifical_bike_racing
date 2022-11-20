@@ -52,7 +52,8 @@ impl Plugin for PlayerPlugin {
         .add_system(kill_system)
         .add_system(record_player_positions)
         .add_system(sync_palyer_lights)
-        .add_system(swap_camera);
+        .add_system(swap_camera)
+        .add_system(player_light_system);
         if self.grpc {
             app.add_system(player_input_grpc)
                 .add_system(send_player_view_grpc);
@@ -327,6 +328,25 @@ fn swap_camera(keys: Res<Input<KeyCode>>, mut players: Query<(&mut FollowCamera,
             players
                 .iter_mut()
                 .for_each(|mut p| p.0.follows = p.1.index == next);
+        }
+    }
+}
+
+fn player_light_system(
+    players: Query<(&PlayerMarker, &Children)>,
+    mut lights: Query<&mut PointLight>,
+) {
+    for (player, children) in players.iter() {
+        dbg!(children.iter().count());
+        if let Ok(mut light) = lights.get_mut(*children.iter().next().unwrap()) {
+            dbg!(&light);
+            light.intensity = (player.current_position.unwrap_or(0) < 3) as u32 as f32 * 15000.0;
+            light.color = match player.current_position.unwrap_or(0) {
+                0 => Color::GOLD,
+                1 => Color::SILVER,
+                2 => Color::CRIMSON,
+                _ => Color::WHITE,
+            };
         }
     }
 }
