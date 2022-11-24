@@ -3,12 +3,6 @@ pub mod load_texture;
 mod noise;
 pub mod terrain;
 
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
-
 use bevy::{
     prelude::{shape::Cube, *},
     render::view::NoFrustumCulling,
@@ -16,11 +10,14 @@ use bevy::{
 
 use bevy_rapier3d::prelude::*;
 
-use crate::player::setup_player;
+use crate::{
+    player::{setup_player, RecordingPathsResource},
+    HistoryResource,
+};
 
 use self::{
     checkpoint::{
-        checkpoint_collection, only_show_next_checkpoint, setup_checkpoints, FrameCounter, History,
+        checkpoint_collection, only_show_next_checkpoint, setup_checkpoints, FrameCounter,
     },
     load_texture::setup_texture_atlas,
     terrain::Terrain,
@@ -39,11 +36,11 @@ impl Plugin for WorldPlugin {
 
 fn setup_world(
     mut commands: Commands,
-    history: Res<Arc<Mutex<HashMap<Entity, History>>>>,
+    history: Res<HistoryResource>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
-    player_recordings: Res<Vec<PathBuf>>,
+    player_recordings: Res<RecordingPathsResource>,
 ) {
     let atlas = setup_texture_atlas(&mut images);
     let mut terrain = Terrain::new(430, 1.0);
@@ -53,12 +50,12 @@ fn setup_world(
         &mut commands,
         &mut meshes,
         &mut materials,
-        &player_recordings,
+        &player_recordings.0,
         start_cube_position,
     );
     setup_checkpoints(
         &mut commands,
-        &history,
+        &history.0,
         &mut meshes,
         &mut materials,
         &mut terrain,
@@ -69,7 +66,7 @@ fn setup_world(
     commands.insert_resource(terrain);
     let mesh = meshes.add(mesh);
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             mesh,
             material: materials.add(atlas.material),
             ..Default::default()
@@ -88,7 +85,7 @@ fn setup_start_cube(
     if let Some(edge_height) = terrain.get_height(0.0, dbg!(max.y - 1.0)) {
         let cube_position = Vec3::new(0.0, edge_height - 2.0, max.y);
         commands
-            .spawn_bundle(PbrBundle {
+            .spawn(PbrBundle {
                 transform: Transform::from_translation(cube_position),
                 mesh: meshes.add(Mesh::from(Cube::new(4.0))),
                 material: materials.add(StandardMaterial {

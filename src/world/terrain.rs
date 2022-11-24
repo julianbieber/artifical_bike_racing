@@ -8,6 +8,7 @@ use bevy::{
 use bevy_rapier3d::prelude::Collider;
 use statrs::statistics::Statistics;
 
+#[derive(Resource)]
 pub struct Terrain {
     quads: Vec<Vec<Quad>>,
     size: f32,

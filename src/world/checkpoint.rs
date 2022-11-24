@@ -12,6 +12,7 @@ use rand::prelude::*;
 use rand::rngs::SmallRng;
 
 use crate::player::PlayerMarker;
+use crate::HistoryResource;
 
 use super::terrain::Terrain;
 
@@ -114,7 +115,7 @@ fn spawn_checkpoint(
     players: &Vec<Entity>,
 ) {
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             transform: Transform::from_translation(translation),
             mesh,
             material: material.clone(),
@@ -144,6 +145,7 @@ fn spawn_checkpoint(
     // });
 }
 
+#[derive(Resource)]
 pub struct FrameCounter {
     pub count: usize,
 }
@@ -151,7 +153,7 @@ pub struct FrameCounter {
 /// frame counter per player
 pub fn checkpoint_collection(
     mut commands: Commands,
-    history: ResMut<Arc<Mutex<HashMap<Entity, History>>>>,
+    history: ResMut<HistoryResource>,
     mut frame_counter: ResMut<FrameCounter>,
     mut collision_events: EventReader<CollisionEvent>,
     mut checkpoints: Query<(Entity, &mut Checkpoint)>,
@@ -161,7 +163,7 @@ pub fn checkpoint_collection(
     let players: HashSet<Entity> = player_query.iter().map(|v| v.0).collect();
     if !players.is_empty() {
         frame_counter.count += 1;
-        let mut history = history.lock().unwrap();
+        let mut history = history.0.lock().unwrap();
         for e in collision_events.iter() {
             match e {
                 CollisionEvent::Started(e1, e2, _) if players.contains(e1) => {
@@ -230,9 +232,10 @@ fn collect_cp(
 
 pub fn only_show_next_checkpoint(
     mut checkpoints: Query<(&mut Visibility, &mut Handle<StandardMaterial>, &Checkpoint)>,
-    history: Res<Arc<Mutex<HashMap<Entity, History>>>>,
+    history: Res<HistoryResource>,
 ) {
     let max_next_cp = history
+        .0
         .lock()
         .unwrap()
         .iter()

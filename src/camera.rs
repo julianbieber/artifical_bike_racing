@@ -5,10 +5,8 @@ pub struct CameraPlugin {
 }
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        if self.active {
-            app.add_startup_system(cursor_grab_system);
-        }
         app.add_startup_system(setup_graphics)
+            .add_system(cursor_grab_system)
             .add_system_to_stage(
                 CoreStage::PostUpdate,
                 rotate_camera.after(TransformSystem::TransformPropagate),
@@ -25,13 +23,13 @@ fn setup_graphics(mut commands: Commands) {
     // Add a camera so we can see the debug-render.
     let camera_transform = Transform::from_xyz(0.0, 4.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y);
     commands
-        .spawn_bundle(TransformBundle {
+        .spawn(TransformBundle {
             ..Default::default()
         })
         .insert(IsChildOf { parent: None })
         .insert(CameraOrientation::from(camera_transform))
         .with_children(|cb| {
-            cb.spawn_bundle(Camera3dBundle {
+            cb.spawn(Camera3dBundle {
                 transform: camera_transform,
                 ..Default::default()
             });
@@ -113,11 +111,14 @@ fn fix_camera_global(
     }
 }
 
-fn cursor_grab_system(mut windows: ResMut<Windows>) {
-    let window = windows.get_primary_mut().unwrap();
+fn cursor_grab_system(mut windows: ResMut<Windows>, mouse: Res<Input<MouseButton>>) {
+    if mouse.just_pressed(MouseButton::Left) {
+        let window = windows.get_primary_mut().unwrap();
 
-    window.set_cursor_lock_mode(true);
-    window.set_cursor_visibility(false);
+        window.set_cursor_grab_mode(bevy::window::CursorGrabMode::Confined);
+        window.set_cursor_visibility(false);
+        window.set_mode(WindowMode::Fullscreen);
+    }
 }
 
 fn set_camera_follow(

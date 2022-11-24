@@ -7,14 +7,16 @@ use std::{
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     prelude::*,
-    window::{PresentMode, WindowMode},
 };
 use bevy_rapier3d::prelude::*;
 use camera::CameraPlugin;
 use clap::Parser;
 use player::PlayerPlugin;
-use server::start_server;
-use tokio::runtime::Runtime;
+use server::{start_server, FrameState, NextFrame};
+use tokio::{
+    runtime::Runtime,
+    sync::mpsc::{Receiver, Sender},
+};
 use world::{checkpoint::History, WorldPlugin};
 
 mod camera;
@@ -36,6 +38,21 @@ struct Opt {
     save: Option<PathBuf>,
 }
 
+#[derive(Resource)]
+pub struct RuntimeResoure(pub Runtime);
+#[derive(Resource)]
+pub struct FrameStateSenderResource(pub Sender<FrameState>);
+#[derive(Resource)]
+pub struct HistoryResource(pub Arc<Mutex<HashMap<Entity, History>>>);
+#[derive(Resource)]
+pub struct NextFrameResource(pub Receiver<NextFrame>);
+
+#[derive(Resource)]
+pub struct ShutdownResource(pub Receiver<()>);
+
+#[derive(Resource)]
+pub struct SavePathReource(pub Option<PathBuf>);
+
 fn main() {
     let opt = dbg!(Opt::parse());
     let runtime = Runtime::new().unwrap();
@@ -54,19 +71,12 @@ fn main() {
         opt.port,
     );
     let mut a = App::new();
-    if opt.cont {
-        a.insert_resource(WindowDescriptor {
-            mode: WindowMode::Fullscreen,
-            present_mode: PresentMode::AutoVsync,
-            ..default()
-        });
-    }
-    a.insert_resource(next_reciever)
-        .insert_resource(history)
-        .insert_resource(frame_sender)
-        .insert_resource(runtime)
-        .insert_resource(shutdown_receiver)
-        .insert_resource(opt.save)
+    a.insert_resource(NextFrameResource(next_reciever))
+        .insert_resource(HistoryResource(history))
+        .insert_resource(FrameStateSenderResource(frame_sender))
+        .insert_resource(RuntimeResoure(runtime))
+        .insert_resource(ShutdownResource(shutdown_receiver))
+        .insert_resource(SavePathReource(opt.save))
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(WorldPlugin {})
