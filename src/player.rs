@@ -349,7 +349,6 @@ fn player_light_system(
     sorted_players.sort_unstable_by(|a, b| b.2.cmp(&a.2).then_with(|| a.1.cmp(&b.1)));
     for (position, (entity, _, _)) in sorted_players.iter().enumerate() {
         if let Some((mut light, _)) = lights.iter_mut().find(|l| l.1.player == *entity) {
-            dbg!(&light);
             light.intensity = (position < 3) as u32 as f32 * 15000.0;
             light.color = match position {
                 0 => Color::GOLD,

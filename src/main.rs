@@ -32,6 +32,8 @@ struct Opt {
     #[arg(long)]
     cont: bool,
     #[arg(long)]
+    seed: u32,
+    #[arg(long)]
     /// singular to make the cli more intuitive
     recording: Vec<PathBuf>,
     #[arg(long)]
@@ -79,7 +81,7 @@ fn main() {
         .insert_resource(SavePathReource(opt.save))
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugin(WorldPlugin {})
+        .add_plugin(WorldPlugin { seed: opt.seed })
         .add_plugin(CameraPlugin { active: opt.cont })
         .add_plugin(PlayerPlugin {
             grpc: !opt.cont,

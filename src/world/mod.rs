@@ -23,11 +23,18 @@ use self::{
     terrain::Terrain,
 };
 
-pub struct WorldPlugin {}
+pub struct WorldPlugin {
+    pub seed: u32,
+}
+#[derive(Resource)]
+struct Seed {
+    value: u32,
+}
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(FrameCounter { count: 0 })
+            .insert_resource(Seed { value: self.seed })
             .add_system(checkpoint_collection)
             .add_system(only_show_next_checkpoint)
             .add_startup_system(setup_world);
@@ -41,9 +48,10 @@ fn setup_world(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
     player_recordings: Res<RecordingPathsResource>,
+    seed: Res<Seed>,
 ) {
     let atlas = setup_texture_atlas(&mut images);
-    let mut terrain = Terrain::new(430, 1.0);
+    let mut terrain = Terrain::new(430, 1.0, seed.value);
     let start_cube_position =
         setup_start_cube(&mut commands, &terrain, &mut meshes, &mut materials);
     let players = setup_player(
@@ -61,6 +69,7 @@ fn setup_world(
         &mut terrain,
         start_cube_position,
         &players,
+        seed.value,
     );
     let (mesh, collider) = terrain.to_mesh(&atlas);
     commands.insert_resource(terrain);

@@ -48,6 +48,7 @@ pub fn setup_checkpoints(
     terrain: &mut Terrain,
     start_cube: (Vec3, f32),
     players: &Vec<Entity>,
+    seed: u32,
 ) {
     let mut history = history.lock().unwrap();
     let material = materials.add(StandardMaterial {
@@ -74,7 +75,7 @@ pub fn setup_checkpoints(
         material_2.clone(),
         players,
     );
-    let track = create_track(Vec2::new(start_cube.0.x, start_cube.0.z));
+    let track = create_track(Vec2::new(start_cube.0.x, start_cube.0.z), seed);
     let mut track_with_start = vec![Vec2::new(start_cube.0.x, start_cube.0.z)];
     track_with_start.extend(track.iter());
     terrain.register_road(&track_with_start);
@@ -252,8 +253,8 @@ pub fn only_show_next_checkpoint(
     }
 }
 
-fn create_track(start: Vec2) -> Vec<Vec2> {
-    let generator = TrackGenerator::new(2, Vec2::new(-1.0, -10.0));
+fn create_track(start: Vec2, seed: u32) -> Vec<Vec2> {
+    let generator = TrackGenerator::new(seed as u64, Vec2::new(-1.0, -10.0));
     generator.generate(start)
 }
 

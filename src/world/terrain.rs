@@ -15,10 +15,10 @@ pub struct Terrain {
 }
 
 impl Terrain {
-    pub fn new(size: usize, s: f32) -> Terrain {
+    pub fn new(size: usize, s: f32, seed: u32) -> Terrain {
         let mut min_height = std::f32::INFINITY;
         let mut max_height = std::f32::NEG_INFINITY;
-        let noise = WorldNoise::new();
+        let noise = WorldNoise::new(seed);
         let quads = (0..size)
             .map(|x| {
                 (0..size)
