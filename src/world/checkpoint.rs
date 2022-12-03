@@ -1,10 +1,8 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use bevy::math::Affine2;
-use bevy::prelude::{shape::Icosphere, *};
-use bevy::render::view::NoFrustumCulling;
+use bevy::prelude::*;
 use bevy::utils::HashSet;
 use bevy_rapier3d::prelude::*;
 use rand::distributions::Standard;
@@ -18,11 +16,11 @@ use super::terrain::Terrain;
 
 #[derive(Component)]
 pub struct Checkpoint {
-    number: u8,
-    remaining_players: Vec<Entity>,
-    total_player_count: usize,
-    first_place_color: Handle<StandardMaterial>,
-    remaining_color: Handle<StandardMaterial>,
+    pub number: u8,
+    pub remaining_players: Vec<Entity>,
+    pub total_player_count: usize,
+    pub first_place_color: Handle<StandardMaterial>,
+    pub remaining_color: Handle<StandardMaterial>,
 }
 pub struct History {
     pub total: i32,
@@ -40,17 +38,17 @@ impl History {
     }
 }
 
-pub fn setup_checkpoints(
-    commands: &mut Commands,
-    history: &Arc<Mutex<HashMap<Entity, History>>>,
-    meshes: &mut Assets<Mesh>,
+pub fn build_checkpoints(
     materials: &mut Assets<StandardMaterial>,
     terrain: &mut Terrain,
-    start_cube: (Vec3, f32),
-    players: &Vec<Entity>,
     seed: u32,
-) {
-    let mut history = history.lock().unwrap();
+) -> Vec<(Vec3, Checkpoint)> {
+    let start = {
+        let x = 0.0;
+        let z = terrain.get_dimensions().1.y / 2.0 - 1.0;
+        let y = terrain.get_height(x, z).unwrap() + 1.0;
+        Vec3::new(x, y, z)
+    };
     let material = materials.add(StandardMaterial {
         base_color: Color::rgba(0.0, 0.5, 0.0, 0.5),
         alpha_mode: AlphaMode::Blend,
@@ -61,77 +59,37 @@ pub fn setup_checkpoints(
         alpha_mode: AlphaMode::Blend,
         ..Default::default()
     });
-    let mesh = meshes.add(Mesh::from(Icosphere {
-        radius: 3.0,
-        subdivisions: 8,
-    }));
 
-    spawn_checkpoint(
-        0,
-        start_cube.0 + Vec3::Y * start_cube.1,
-        commands,
-        mesh.clone(),
-        material.clone(),
-        material_2.clone(),
-        players,
-    );
-    let track = create_track(Vec2::new(start_cube.0.x, start_cube.0.z), seed);
-    let mut track_with_start = vec![Vec2::new(start_cube.0.x, start_cube.0.z)];
+    let mut checkpoints = Vec::new();
+    let track = create_track(Vec2::new(start.x, start.z), seed);
+    let mut track_with_start = vec![Vec2::new(start.x, start.z)];
     track_with_start.extend(track.iter());
     terrain.register_road(&track_with_start);
-    for (i, c) in track.into_iter().enumerate() {
+    for (i, c) in track_with_start.into_iter().enumerate() {
         if let Some(height) = terrain.get_height(c.x, c.y) {
-            spawn_checkpoint(
-                (i + 1) as u8,
+            checkpoints.push((
                 Vec3::new(c.x, height + 3.0, c.y),
-                commands,
-                mesh.clone(),
-                material.clone(),
-                material_2.clone(),
-                players,
-            );
+                build_checkpoint((i) as u8, material.clone(), material_2.clone()),
+            ));
+        } else {
+            break;
         }
     }
-    *history = players
-        .iter()
-        .map(|e| {
-            (
-                *e,
-                History {
-                    total: track_with_start.len() as i32,
-                    collected_checkpoints: Vec::with_capacity(255),
-                },
-            )
-        })
-        .collect();
+    checkpoints
 }
 
-fn spawn_checkpoint(
+fn build_checkpoint(
     number: u8,
-    translation: Vec3,
-    commands: &mut Commands,
-    mesh: Handle<Mesh>,
     material: Handle<StandardMaterial>,
     material_2: Handle<StandardMaterial>,
-    players: &Vec<Entity>,
-) {
-    commands
-        .spawn(PbrBundle {
-            transform: Transform::from_translation(translation),
-            mesh,
-            material: material.clone(),
-            ..Default::default()
-        })
-        .insert(NoFrustumCulling {})
-        .insert(Collider::ball(3.0))
-        .insert(Sensor)
-        .insert(Checkpoint {
-            number,
-            remaining_players: players.clone(),
-            total_player_count: players.len(),
-            first_place_color: material,
-            remaining_color: material_2,
-        });
+) -> Checkpoint {
+    Checkpoint {
+        number,
+        remaining_players: Vec::new(),
+        total_player_count: 0,
+        first_place_color: material,
+        remaining_color: material_2,
+    }
     // .with_children(|cb| {
     //     cb.spawn_bundle(PointLightBundle {
     //         point_light: PointLight {
