@@ -11,7 +11,7 @@ use bevy::{
 use bevy_rapier3d::prelude::*;
 
 use crate::{
-    player::{setup_player, RecordingPathsResource},
+    player::{setup_player, PlayerSetupResource},
     HistoryResource,
 };
 
@@ -48,7 +48,7 @@ fn setup_world(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
-    player_recordings: Res<RecordingPathsResource>,
+    player_recordings: Res<PlayerSetupResource>,
     seed: Res<Seed>,
 ) {
     let mut history = history.0.lock().unwrap();
@@ -59,7 +59,8 @@ fn setup_world(
         &mut commands,
         &mut meshes,
         &mut materials,
-        &player_recordings.0,
+        &player_recordings.paths,
+        &player_recordings.colors,
         (checkpoints[0].0, 2.0),
     );
     let checkpoint_mesh = meshes.add(

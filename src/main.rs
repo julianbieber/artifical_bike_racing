@@ -37,7 +37,20 @@ struct Opt {
     /// singular to make the cli more intuitive
     recording: Vec<PathBuf>,
     #[arg(long)]
+    color: Vec<PlayerColor>,
+    #[arg(long)]
     save: Option<PathBuf>,
+}
+
+#[derive(clap::ValueEnum, Debug, Clone)]
+enum PlayerColor {
+    Red,
+    Green,
+    Black,
+    White,
+    Yellow,
+    Blue,
+    Grey,
 }
 
 #[derive(Resource)]
@@ -57,6 +70,9 @@ pub struct SavePathReource(pub Option<PathBuf>);
 
 fn main() {
     let opt = dbg!(Opt::parse());
+    if opt.color.len() != opt.recording.len() {
+        panic!("color and recording must have the same length");
+    }
     let runtime = Runtime::new().unwrap();
     let (frame_sender, frame_reciever) = tokio::sync::mpsc::channel(1);
     let (next_sender, next_reciever) = tokio::sync::mpsc::channel(1);
@@ -86,6 +102,7 @@ fn main() {
         .add_plugin(PlayerPlugin {
             grpc: !opt.cont,
             recording_paths: opt.recording,
+            colors: opt.color.into_iter().map(|v| v.into()).collect(),
         })
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(LogDiagnosticsPlugin {
@@ -94,4 +111,18 @@ fn main() {
 
     a.run();
     t.join().unwrap();
+}
+
+impl From<PlayerColor> for Color {
+    fn from(c: PlayerColor) -> Self {
+        match c {
+            PlayerColor::Red => Color::RED,
+            PlayerColor::Green => Color::GREEN,
+            PlayerColor::Black => Color::BLACK,
+            PlayerColor::White => Color::WHITE,
+            PlayerColor::Yellow => Color::YELLOW,
+            PlayerColor::Blue => Color::BLUE,
+            PlayerColor::Grey => Color::GRAY,
+        }
+    }
 }

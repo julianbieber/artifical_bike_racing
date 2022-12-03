@@ -15,6 +15,7 @@ use crate::{
 pub struct PlayerPlugin {
     pub grpc: bool,
     pub recording_paths: Vec<PathBuf>,
+    pub colors: Vec<Color>,
 }
 
 #[derive(Serialize, Deserialize, Resource)]
@@ -39,14 +40,20 @@ impl From<&Transform> for SerializableTransform {
 }
 
 #[derive(Resource)]
-pub struct RecordingPathsResource(pub Vec<PathBuf>);
+pub struct PlayerSetupResource {
+    pub paths: Vec<PathBuf>,
+    pub colors: Vec<Color>,
+}
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(PlayerMovement {
             transforms: Vec::new(),
         })
-        .insert_resource(RecordingPathsResource(self.recording_paths.clone()))
+        .insert_resource(PlayerSetupResource {
+            paths: self.recording_paths.clone(),
+            colors: self.colors.clone(),
+        })
         .add_system(kill_system)
         .add_system(record_player_positions)
         .add_system(sync_palyer_lights)
@@ -68,6 +75,7 @@ pub fn setup_player(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     paths: &[PathBuf],
+    colors: &[Color],
     start_block: (Vec3, f32),
 ) -> Vec<Entity> {
     let recordings = read_recordings(paths);
@@ -77,13 +85,14 @@ pub fn setup_player(
             meshes,
             materials,
             start_block,
-            Vec::new(),
+            (Vec::new(), Color::BLACK),
             0,
             "self".into(),
         )]
     } else {
         recordings
             .into_iter()
+            .zip(colors.iter())
             .enumerate()
             .map(|(i, r)| {
                 spawn_player(
@@ -91,9 +100,9 @@ pub fn setup_player(
                     meshes,
                     materials,
                     start_block,
-                    r.1.transforms,
+                    (r.0 .1.transforms, *r.1),
                     i,
-                    r.0,
+                    r.0 .0,
                 )
             })
             .collect()
@@ -105,11 +114,11 @@ fn spawn_player(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     start_block_transform: (Vec3, f32),
-    playback: Vec<SerializableTransform>,
+    player_info: (Vec<SerializableTransform>, Color),
     index: usize,
     name: String,
 ) -> Entity {
-    let playback_len = playback.len();
+    let playback_len = player_info.0.len();
     /* Create the bouncing ball. */
     let mut player_entity = commands.spawn(PbrBundle {
         mesh: meshes.add(
@@ -120,6 +129,7 @@ fn spawn_player(
             .into(),
         ),
         material: materials.add(StandardMaterial {
+            base_color: player_info.1,
             ..Default::default()
         }),
         transform: Transform::from_translation(
@@ -137,7 +147,7 @@ fn spawn_player(
             torque: Vec3::ZERO,
         })
         .insert(PlayerMarker {
-            playback_recording: playback,
+            playback_recording: player_info.0,
             playback_position: 0,
             index,
             name,
