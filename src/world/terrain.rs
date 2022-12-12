@@ -95,14 +95,15 @@ impl Terrain {
     }
 
     pub fn get_heights_around(&self, x: f32, z: f32) -> Vec<Option<Quad>> {
+        let size = 4;
         if let Some(indices) = self.world_to_index(x, z) {
-            self.surrounding(indices.0, indices.1, 4)
+            self.surrounding(indices.0, indices.1, size)
                 .into_iter()
                 .flatten()
                 .map(|i| i.map(|i| self.get(i.0, i.1).clone()))
                 .collect()
         } else {
-            vec![None; 25]
+            vec![None; ((size * 2 + 1) * (size * 2 + 1)) as usize]
         }
     }
 
