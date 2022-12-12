@@ -8,16 +8,17 @@ use bevy::{
 use bevy_rapier3d::prelude::Collider;
 use statrs::statistics::Statistics;
 
+#[derive(Resource)]
 pub struct Terrain {
     quads: Vec<Vec<Quad>>,
     size: f32,
 }
 
 impl Terrain {
-    pub fn new(size: usize, s: f32) -> Terrain {
+    pub fn new(size: usize, s: f32, seed: u32) -> Terrain {
         let mut min_height = std::f32::INFINITY;
         let mut max_height = std::f32::NEG_INFINITY;
-        let noise = WorldNoise::new();
+        let noise = WorldNoise::new(seed);
         let quads = (0..size)
             .map(|x| {
                 (0..size)
@@ -94,14 +95,15 @@ impl Terrain {
     }
 
     pub fn get_heights_around(&self, x: f32, z: f32) -> Vec<Option<Quad>> {
+        let size = 4;
         if let Some(indices) = self.world_to_index(x, z) {
-            self.surrounding(indices.0, indices.1, 4)
+            self.surrounding(indices.0, indices.1, size)
                 .into_iter()
                 .flatten()
                 .map(|i| i.map(|i| self.get(i.0, i.1).clone()))
                 .collect()
         } else {
-            vec![None; 25]
+            vec![None; ((size * 2 + 1) * (size * 2 + 1)) as usize]
         }
     }
 

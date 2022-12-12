@@ -3,34 +3,39 @@ pub mod load_texture;
 mod noise;
 pub mod terrain;
 
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
-
 use bevy::{
-    prelude::{shape::Cube, *},
+    prelude::{shape::Icosphere, *},
     render::view::NoFrustumCulling,
 };
 
 use bevy_rapier3d::prelude::*;
 
-use crate::player::setup_player;
+use crate::{
+    player::{setup_player, PlayerSetupResource},
+    HistoryResource,
+};
 
 use self::{
     checkpoint::{
-        checkpoint_collection, only_show_next_checkpoint, setup_checkpoints, FrameCounter, History,
+        build_checkpoints, checkpoint_collection, only_show_next_checkpoint, Checkpoint,
+        FrameCounter, History,
     },
     load_texture::setup_texture_atlas,
     terrain::Terrain,
 };
 
-pub struct WorldPlugin {}
+pub struct WorldPlugin {
+    pub seed: u32,
+}
+#[derive(Resource)]
+struct Seed {
+    value: u32,
+}
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(FrameCounter { count: 0 })
+            .insert_resource(Seed { value: self.seed })
             .add_system(checkpoint_collection)
             .add_system(only_show_next_checkpoint)
             .add_startup_system(setup_world);
@@ -39,37 +44,60 @@ impl Plugin for WorldPlugin {
 
 fn setup_world(
     mut commands: Commands,
-    history: Res<Arc<Mutex<HashMap<Entity, History>>>>,
+    history: Res<HistoryResource>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
-    player_recordings: Res<Vec<PathBuf>>,
+    player_recordings: Res<PlayerSetupResource>,
+    seed: Res<Seed>,
 ) {
+    let mut history = history.0.lock().unwrap();
     let atlas = setup_texture_atlas(&mut images);
-    let mut terrain = Terrain::new(430, 1.0);
-    let start_cube_position =
-        setup_start_cube(&mut commands, &terrain, &mut meshes, &mut materials);
+    let mut terrain = Terrain::new(430, 1.0, seed.value);
+    let checkpoints = build_checkpoints(&mut materials, &mut terrain, seed.value);
     let players = setup_player(
         &mut commands,
         &mut meshes,
         &mut materials,
-        &player_recordings,
-        start_cube_position,
+        &player_recordings.paths,
+        &player_recordings.colors,
+        (checkpoints[0].0, 2.0),
     );
-    setup_checkpoints(
-        &mut commands,
-        &history,
-        &mut meshes,
-        &mut materials,
-        &mut terrain,
-        start_cube_position,
-        &players,
+    let checkpoint_mesh = meshes.add(
+        Icosphere {
+            radius: 3.0,
+            subdivisions: 8,
+        }
+        .into(),
     );
+
+    *history = players
+        .iter()
+        .map(|e| {
+            (
+                *e,
+                History {
+                    total: checkpoints.len() as i32,
+                    collected_checkpoints: Vec::with_capacity(255),
+                },
+            )
+        })
+        .collect();
+    for (trnaslation, mut checkpoint) in checkpoints {
+        checkpoint.remaining_players = players.clone();
+        checkpoint.total_player_count = players.len();
+        spawn_checkpoint(
+            &mut commands,
+            trnaslation,
+            checkpoint,
+            checkpoint_mesh.clone(),
+        );
+    }
     let (mesh, collider) = terrain.to_mesh(&atlas);
     commands.insert_resource(terrain);
     let mesh = meshes.add(mesh);
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             mesh,
             material: materials.add(atlas.material),
             ..Default::default()
@@ -78,30 +106,21 @@ fn setup_world(
         .insert(collider);
 }
 
-fn setup_start_cube(
+fn spawn_checkpoint(
     commands: &mut Commands,
-    terrain: &Terrain,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-) -> (Vec3, f32) {
-    let (_min, max) = dbg!(terrain.get_dimensions());
-    if let Some(edge_height) = terrain.get_height(0.0, dbg!(max.y - 1.0)) {
-        let cube_position = Vec3::new(0.0, edge_height - 2.0, max.y);
-        commands
-            .spawn_bundle(PbrBundle {
-                transform: Transform::from_translation(cube_position),
-                mesh: meshes.add(Mesh::from(Cube::new(4.0))),
-                material: materials.add(StandardMaterial {
-                    base_color: Color::BLACK,
-                    ..Default::default()
-                }),
-                ..Default::default()
-            })
-            .insert(RigidBody::Fixed)
-            .insert(NoFrustumCulling {})
-            .insert(Collider::cuboid(2.0, 2.0, 2.0));
-        (cube_position, 4.0)
-    } else {
-        panic!("cound not palce start block");
-    }
+    translation: Vec3,
+    checkpoint: Checkpoint,
+    checkpoint_mesh: Handle<Mesh>,
+) {
+    commands
+        .spawn(PbrBundle {
+            transform: Transform::from_translation(translation),
+            mesh: checkpoint_mesh,
+            material: checkpoint.first_place_color.clone(),
+            ..Default::default()
+        })
+        .insert(NoFrustumCulling {})
+        .insert(Collider::ball(3.0))
+        .insert(Sensor)
+        .insert(checkpoint);
 }

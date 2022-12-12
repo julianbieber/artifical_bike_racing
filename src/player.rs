@@ -6,23 +6,19 @@ use bevy::{
 };
 use bevy_rapier3d::prelude::*;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    runtime::Runtime,
-    sync::mpsc::{Receiver, Sender},
-};
 
 use crate::{
-    camera::FollowCamera,
-    server::{FrameState, NextFrame},
-    world::terrain::Terrain,
+    camera::FollowCamera, server::FrameState, world::terrain::Terrain, FrameStateSenderResource,
+    HistoryResource, NextFrameResource, RuntimeResoure, SavePathReource, ShutdownResource,
 };
 
 pub struct PlayerPlugin {
     pub grpc: bool,
     pub recording_paths: Vec<PathBuf>,
+    pub colors: Vec<Color>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Resource)]
 struct PlayerMovement {
     transforms: Vec<SerializableTransform>,
 }
@@ -43,16 +39,26 @@ impl From<&Transform> for SerializableTransform {
     }
 }
 
+#[derive(Resource)]
+pub struct PlayerSetupResource {
+    pub paths: Vec<PathBuf>,
+    pub colors: Vec<Color>,
+}
+
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(PlayerMovement {
             transforms: Vec::new(),
         })
-        .insert_resource(self.recording_paths.clone())
+        .insert_resource(PlayerSetupResource {
+            paths: self.recording_paths.clone(),
+            colors: self.colors.clone(),
+        })
         .add_system(kill_system)
         .add_system(record_player_positions)
         .add_system(sync_palyer_lights)
-        .add_system(swap_camera);
+        .add_system(swap_camera)
+        .add_system(player_light_system);
         if self.grpc {
             app.add_system(player_input_grpc)
                 .add_system(send_player_view_grpc);
@@ -69,6 +75,7 @@ pub fn setup_player(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     paths: &[PathBuf],
+    colors: &[Color],
     start_block: (Vec3, f32),
 ) -> Vec<Entity> {
     let recordings = read_recordings(paths);
@@ -78,13 +85,14 @@ pub fn setup_player(
             meshes,
             materials,
             start_block,
-            Vec::new(),
+            (Vec::new(), Color::BLACK),
             0,
             "self".into(),
         )]
     } else {
         recordings
             .into_iter()
+            .zip(colors.iter())
             .enumerate()
             .map(|(i, r)| {
                 spawn_player(
@@ -92,9 +100,9 @@ pub fn setup_player(
                     meshes,
                     materials,
                     start_block,
-                    r.1.transforms,
+                    (r.0 .1.transforms, *r.1),
                     i,
-                    r.0,
+                    r.0 .0,
                 )
             })
             .collect()
@@ -106,13 +114,13 @@ fn spawn_player(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     start_block_transform: (Vec3, f32),
-    playback: Vec<SerializableTransform>,
+    player_info: (Vec<SerializableTransform>, Color),
     index: usize,
     name: String,
 ) -> Entity {
-    let playback_len = playback.len();
+    let playback_len = player_info.0.len();
     /* Create the bouncing ball. */
-    let mut player_entity = commands.spawn_bundle(PbrBundle {
+    let mut player_entity = commands.spawn(PbrBundle {
         mesh: meshes.add(
             Icosphere {
                 radius: 0.5,
@@ -121,6 +129,7 @@ fn spawn_player(
             .into(),
         ),
         material: materials.add(StandardMaterial {
+            base_color: player_info.1,
             ..Default::default()
         }),
         transform: Transform::from_translation(
@@ -138,7 +147,7 @@ fn spawn_player(
             torque: Vec3::ZERO,
         })
         .insert(PlayerMarker {
-            playback_recording: playback,
+            playback_recording: player_info.0,
             playback_position: 0,
             index,
             name,
@@ -161,14 +170,13 @@ fn spawn_player(
             .id()
     };
     commands
-        .spawn_bundle(PointLightBundle {
+        .spawn(PointLightBundle {
             point_light: PointLight {
                 intensity: 15000.0,
-                radius: 100.0,
                 shadows_enabled: true,
                 ..default()
             },
-            transform: Transform::from_xyz(2.0, 22.0, 50.0),
+            transform: Transform::IDENTITY,
             ..default()
         })
         .insert(PlayerLight {
@@ -203,12 +211,12 @@ fn player_debug_inputs(
 }
 
 fn player_input_grpc(
-    runtime: Res<Runtime>,
-    mut next_frame_receiver: ResMut<Receiver<NextFrame>>,
+    runtime: Res<RuntimeResoure>,
+    mut next_frame_receiver: ResMut<NextFrameResource>,
     mut player_query: Query<&mut ExternalForce, With<PlayerMarker>>,
 ) {
-    runtime.block_on(async {
-        let force = next_frame_receiver.recv().await.unwrap();
+    runtime.0.block_on(async {
+        let force = next_frame_receiver.0.recv().await.unwrap();
         for mut impulse in player_query.iter_mut() {
             impulse.force = Vec3::new(force.x, 0.0, force.z);
         }
@@ -227,12 +235,12 @@ fn sync_palyer_lights(
 }
 
 fn send_player_view_grpc(
-    runtime: Res<Runtime>,
-    state_sender: Res<Sender<FrameState>>,
+    runtime: Res<RuntimeResoure>,
+    state_sender: Res<FrameStateSenderResource>,
     terrain: Res<Terrain>,
     player_query: Query<&Transform, With<PlayerMarker>>,
 ) {
-    runtime.block_on(async {
+    runtime.0.block_on(async {
         if let Some(player_position) = player_query.iter().next() {
             let surrounding = terrain
                 .get_heights_around(player_position.translation.x, player_position.translation.z)
@@ -240,6 +248,7 @@ fn send_player_view_grpc(
                 .map(|q| q.map(|q| (q.texture, q.height)))
                 .collect();
             state_sender
+                .0
                 .send(FrameState {
                     surrounding,
                     player: player_position.translation,
@@ -261,13 +270,13 @@ fn record_player_positions(
 
 fn kill_system(
     keys: Res<Input<KeyCode>>,
-    mut shutdown_receiver: ResMut<Receiver<()>>,
+    mut shutdown_receiver: ResMut<ShutdownResource>,
     positions: Res<PlayerMovement>,
-    save_path: Res<Option<PathBuf>>,
+    save_path: Res<SavePathReource>,
 ) {
-    let receievd = shutdown_receiver.try_recv().is_ok();
+    let receievd = shutdown_receiver.0.try_recv().is_ok();
     if keys.just_pressed(KeyCode::Escape) || receievd {
-        if let Some(save_path) = save_path.into_inner() {
+        if let Some(save_path) = &save_path.0 {
             let positions_json = serde_json::to_string(positions.into_inner()).unwrap();
             let mut file = OpenOptions::new()
                 .create(true)
@@ -327,6 +336,36 @@ fn swap_camera(keys: Res<Input<KeyCode>>, mut players: Query<(&mut FollowCamera,
             players
                 .iter_mut()
                 .for_each(|mut p| p.0.follows = p.1.index == next);
+        }
+    }
+}
+
+fn player_light_system(
+    players: Query<(Entity, &PlayerMarker)>,
+    mut lights: Query<(&mut PointLight, &PlayerLight)>,
+    history: Res<HistoryResource>,
+) {
+    let history = history.0.lock().unwrap();
+    let mut sorted_players: Vec<_> = players
+        .iter()
+        .map(|(e, p)| {
+            (
+                e,
+                p.current_position,
+                history[&e].collected_checkpoints.len(),
+            )
+        })
+        .collect();
+    sorted_players.sort_unstable_by(|a, b| b.2.cmp(&a.2).then_with(|| a.1.cmp(&b.1)));
+    for (position, (entity, _, _)) in sorted_players.iter().enumerate() {
+        if let Some((mut light, _)) = lights.iter_mut().find(|l| l.1.player == *entity) {
+            light.intensity = (position < 3) as u32 as f32 * 15000.0;
+            light.color = match position {
+                0 => Color::GOLD,
+                1 => Color::SILVER,
+                2 => Color::CRIMSON,
+                _ => Color::WHITE,
+            };
         }
     }
 }

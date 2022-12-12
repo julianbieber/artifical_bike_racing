@@ -5,31 +5,31 @@ pub struct WorldNoise {
     samplers: Vec<NoiseSampler>,
 }
 impl WorldNoise {
-    pub fn new() -> Self {
+    pub fn new(seed: u32) -> Self {
         Self {
             samplers: vec![
                 NoiseSampler {
-                    simplex: Fbm::new(0),
+                    simplex: Fbm::new(seed),
                     divisor: 50.0,
                     height_multiplier: 2.5,
                 },
                 NoiseSampler {
-                    simplex: Fbm::new(5),
+                    simplex: Fbm::new(seed + 1),
                     divisor: 10.0,
                     height_multiplier: 1.5,
                 },
                 NoiseSampler {
-                    simplex: Fbm::new(4),
+                    simplex: Fbm::new(seed + 2),
                     divisor: 5.0,
                     height_multiplier: 0.5,
                 },
                 NoiseSampler {
-                    simplex: Fbm::new(3),
+                    simplex: Fbm::new(seed + 3),
                     divisor: 75.0,
                     height_multiplier: 5.5,
                 },
                 NoiseSampler {
-                    simplex: Fbm::new(2),
+                    simplex: Fbm::new(seed + 4),
                     divisor: 100.0,
                     height_multiplier: 20.5,
                 },

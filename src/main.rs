@@ -5,16 +5,26 @@ use std::{
 };
 
 use bevy::{
+    audio::AudioPlugin,
+    core_pipeline::CorePipelinePlugin,
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    gltf::GltfPlugin,
+    pbr::PbrPlugin,
     prelude::*,
-    window::{PresentMode, WindowMode},
+    render::RenderPlugin,
+    sprite::SpritePlugin,
+    text::TextPlugin,
+    ui::UiPlugin,
 };
 use bevy_rapier3d::prelude::*;
 use camera::CameraPlugin;
 use clap::Parser;
 use player::PlayerPlugin;
-use server::start_server;
-use tokio::runtime::Runtime;
+use server::{start_server, FrameState, NextFrame};
+use tokio::{
+    runtime::Runtime,
+    sync::mpsc::{Receiver, Sender},
+};
 use world::{checkpoint::History, WorldPlugin};
 
 mod camera;
@@ -30,14 +40,49 @@ struct Opt {
     #[arg(long)]
     cont: bool,
     #[arg(long)]
+    headless: bool,
+    #[arg(long)]
+    seed: u32,
+    #[arg(long)]
     /// singular to make the cli more intuitive
     recording: Vec<PathBuf>,
+    #[arg(long)]
+    color: Vec<PlayerColor>,
     #[arg(long)]
     save: Option<PathBuf>,
 }
 
+#[derive(clap::ValueEnum, Debug, Clone)]
+enum PlayerColor {
+    Red,
+    Green,
+    Black,
+    White,
+    Yellow,
+    Blue,
+    Grey,
+}
+
+#[derive(Resource)]
+pub struct RuntimeResoure(pub Runtime);
+#[derive(Resource)]
+pub struct FrameStateSenderResource(pub Sender<FrameState>);
+#[derive(Resource)]
+pub struct HistoryResource(pub Arc<Mutex<HashMap<Entity, History>>>);
+#[derive(Resource)]
+pub struct NextFrameResource(pub Receiver<NextFrame>);
+
+#[derive(Resource)]
+pub struct ShutdownResource(pub Receiver<()>);
+
+#[derive(Resource)]
+pub struct SavePathReource(pub Option<PathBuf>);
+
 fn main() {
     let opt = dbg!(Opt::parse());
+    if opt.color.len() != opt.recording.len() {
+        panic!("color and recording must have the same length");
+    }
     let runtime = Runtime::new().unwrap();
     let (frame_sender, frame_reciever) = tokio::sync::mpsc::channel(1);
     let (next_sender, next_reciever) = tokio::sync::mpsc::channel(1);
@@ -54,26 +99,45 @@ fn main() {
         opt.port,
     );
     let mut a = App::new();
-    if opt.cont {
-        a.insert_resource(WindowDescriptor {
-            mode: WindowMode::Fullscreen,
-            present_mode: PresentMode::AutoVsync,
-            ..default()
-        });
+    a.insert_resource(NextFrameResource(next_reciever))
+        .insert_resource(HistoryResource(history))
+        .insert_resource(FrameStateSenderResource(frame_sender))
+        .insert_resource(RuntimeResoure(runtime))
+        .insert_resource(ShutdownResource(shutdown_receiver))
+        .insert_resource(SavePathReource(opt.save));
+    if opt.headless {
+        a.add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    add_primary_window: false,
+                    exit_on_all_closed: false,
+                    ..Default::default()
+                })
+                .build()
+                .disable::<AudioPlugin>()
+                .disable::<RenderPlugin>()
+                .disable::<PbrPlugin>()
+                .disable::<SpritePlugin>()
+                .disable::<TextPlugin>()
+                .disable::<UiPlugin>()
+                .disable::<GltfPlugin>()
+                .disable::<AnimationPlugin>()
+                .disable::<CorePipelinePlugin>()
+                .disable::<GilrsPlugin>(),
+        )
+        .add_asset::<Mesh>()
+        .add_asset::<StandardMaterial>();
+    } else {
+        a.add_plugins(DefaultPlugins)
+            .add_plugin(CameraPlugin { active: opt.cont });
     }
-    a.insert_resource(next_reciever)
-        .insert_resource(history)
-        .insert_resource(frame_sender)
-        .insert_resource(runtime)
-        .insert_resource(shutdown_receiver)
-        .insert_resource(opt.save)
-        .add_plugins(DefaultPlugins)
-        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugin(WorldPlugin {})
-        .add_plugin(CameraPlugin { active: opt.cont })
+    a.add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+        .add_startup_system(configure_physics)
+        .add_plugin(WorldPlugin { seed: opt.seed })
         .add_plugin(PlayerPlugin {
             grpc: !opt.cont,
             recording_paths: opt.recording,
+            colors: opt.color.into_iter().map(|v| v.into()).collect(),
         })
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(LogDiagnosticsPlugin {
@@ -82,4 +146,25 @@ fn main() {
 
     a.run();
     t.join().unwrap();
+}
+
+impl From<PlayerColor> for Color {
+    fn from(c: PlayerColor) -> Self {
+        match c {
+            PlayerColor::Red => Color::RED,
+            PlayerColor::Green => Color::GREEN,
+            PlayerColor::Black => Color::BLACK,
+            PlayerColor::White => Color::WHITE,
+            PlayerColor::Yellow => Color::YELLOW,
+            PlayerColor::Blue => Color::BLUE,
+            PlayerColor::Grey => Color::GRAY,
+        }
+    }
+}
+
+fn configure_physics(mut config: ResMut<RapierConfiguration>) {
+    config.timestep_mode = TimestepMode::Fixed {
+        dt: 0.016,
+        substeps: 1,
+    };
 }
