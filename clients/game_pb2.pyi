@@ -18,12 +18,14 @@ class InputRequest(_message.Message):
     def __init__(self, x: _Optional[float] = ..., z: _Optional[float] = ...) -> None: ...
 
 class PlayerView(_message.Message):
-    __slots__ = ["surrounding", "y"]
+    __slots__ = ["distance", "surrounding", "y"]
+    DISTANCE_FIELD_NUMBER: _ClassVar[int]
     SURROUNDING_FIELD_NUMBER: _ClassVar[int]
     Y_FIELD_NUMBER: _ClassVar[int]
+    distance: float
     surrounding: _containers.RepeatedCompositeFieldContainer[Terrain]
     y: float
-    def __init__(self, surrounding: _Optional[_Iterable[_Union[Terrain, _Mapping]]] = ..., y: _Optional[float] = ...) -> None: ...
+    def __init__(self, surrounding: _Optional[_Iterable[_Union[Terrain, _Mapping]]] = ..., y: _Optional[float] = ..., distance: _Optional[float] = ...) -> None: ...
 
 class Score(_message.Message):
     __slots__ = ["timings", "total"]

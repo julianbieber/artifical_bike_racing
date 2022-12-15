@@ -28,6 +28,7 @@ pub mod game {
 pub struct FrameState {
     pub surrounding: Vec<Option<(TextureSections, f32)>>,
     pub player: Vec3,
+    pub distance: f32,
 }
 #[derive(Debug)]
 pub struct NextFrame {
@@ -104,6 +105,7 @@ impl MainService for GameServer {
                     })
                     .collect(),
                 y: state.player.y,
+                distance: state.distance,
             }))
         } else {
             Err(Status::not_found("no new game state available"))

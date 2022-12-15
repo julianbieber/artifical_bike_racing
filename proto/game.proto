@@ -20,6 +20,7 @@ message InputRequest {
 message PlayerView {
   repeated Terrain surrounding = 1;
   float y = 2;
+  float distance = 3;
   
 }
 

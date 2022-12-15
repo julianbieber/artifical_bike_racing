@@ -8,8 +8,11 @@ use bevy_rapier3d::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    camera::FollowCamera, server::FrameState, world::terrain::Terrain, FrameStateSenderResource,
-    HistoryResource, NextFrameResource, RuntimeResoure, SavePathReource, ShutdownResource,
+    camera::FollowCamera,
+    server::FrameState,
+    world::{checkpoint::Checkpoint, terrain::Terrain},
+    FrameStateSenderResource, HistoryResource, NextFrameResource, RuntimeResoure, SavePathReource,
+    ShutdownResource,
 };
 
 pub struct PlayerPlugin {
@@ -238,25 +241,44 @@ fn send_player_view_grpc(
     runtime: Res<RuntimeResoure>,
     state_sender: Res<FrameStateSenderResource>,
     terrain: Res<Terrain>,
-    player_query: Query<&Transform, With<PlayerMarker>>,
+    player_query: Query<(Entity, &Transform), With<PlayerMarker>>,
+    history: Res<HistoryResource>,
+    checkpoints: Query<(&Checkpoint, &Transform)>,
 ) {
-    runtime.0.block_on(async {
-        if let Some(player_position) = player_query.iter().next() {
-            let surrounding = terrain
-                .get_heights_around(player_position.translation.x, player_position.translation.z)
-                .into_iter()
-                .map(|q| q.map(|q| (q.texture, q.height)))
-                .collect();
-            state_sender
-                .0
-                .send(FrameState {
-                    surrounding,
-                    player: player_position.translation,
-                })
-                .await
-                .unwrap();
-        }
-    });
+    let history = history.0.lock().unwrap();
+    let next_state = if let Some((player, player_position)) = player_query.iter().next() {
+        let history = history.get(&player).unwrap();
+        let next_checkpoint_index = history
+            .collected_checkpoints
+            .last()
+            .map(|c| c.0)
+            .unwrap_or(0);
+        let distance_to_next_checkpint = checkpoints
+            .iter()
+            .find(|c| c.0.number == next_checkpoint_index)
+            .map(|c| c.1.translation.distance(player_position.translation))
+            .unwrap_or(0.0);
+
+        let surrounding = terrain
+            .get_heights_around(player_position.translation.x, player_position.translation.z)
+            .into_iter()
+            .map(|q| q.map(|q| (q.texture, q.height)))
+            .collect();
+
+        Some(FrameState {
+            surrounding,
+            player: player_position.translation,
+            distance: distance_to_next_checkpint,
+        })
+    } else {
+        None
+    };
+    drop(history);
+    if let Some(next_state) = next_state {
+        runtime.0.block_on(async {
+            state_sender.0.send(next_state).await.unwrap();
+        });
+    }
 }
 
 fn record_player_positions(

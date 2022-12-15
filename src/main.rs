@@ -35,20 +35,27 @@ mod world;
 
 #[derive(Parser, Clone, Debug)]
 struct Opt {
+    /// port used to start the grpc server
     #[arg(long)]
     port: i32,
+    /// if passed, the game does not wait for grpc input. The simulation runs continously.
     #[arg(long)]
-    cont: bool,
+    continuous: bool,
+    /// if passed, the game will not be rendered.
     #[arg(long)]
     headless: bool,
+    /// The seed for world and track generation
     #[arg(long)]
     seed: u32,
     #[arg(long)]
-    /// singular to make the cli more intuitive
+    /// path to a previously recorded race. The file contains one player transformation (position + rotation) per frame of the previous run.
+    /// The recording will be replayed without additional physics simulation.
     recording: Vec<PathBuf>,
     #[arg(long)]
+    /// color for the recorded sphere. This parameter must be passed the same number of times as recording.
     color: Vec<PlayerColor>,
     #[arg(long)]
+    /// Path under which to save a recoding.
     save: Option<PathBuf>,
 }
 
@@ -128,14 +135,15 @@ fn main() {
         .add_asset::<Mesh>()
         .add_asset::<StandardMaterial>();
     } else {
-        a.add_plugins(DefaultPlugins)
-            .add_plugin(CameraPlugin { active: opt.cont });
+        a.add_plugins(DefaultPlugins).add_plugin(CameraPlugin {
+            active: opt.continuous,
+        });
     }
     a.add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_startup_system(configure_physics)
         .add_plugin(WorldPlugin { seed: opt.seed })
         .add_plugin(PlayerPlugin {
-            grpc: !opt.cont,
+            grpc: !opt.continuous,
             recording_paths: opt.recording,
             colors: opt.color.into_iter().map(|v| v.into()).collect(),
         })
