@@ -5,6 +5,9 @@ You control a sphere that rolls through a 3d world with hills and valleys. The r
 
 The racing track is described by a series of checkpoints that you have to roll through in order.
 
+![example image](Example.png)
+
+
 ## Description of the grpc interface
 The idea behind the interface is that you can retrieve a view of the world around the sphere under your control and apply a force in the x/z plane to change the movement of the sphere.
 The view of the world (`getState`) contains the following fields:
