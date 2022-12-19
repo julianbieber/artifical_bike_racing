@@ -9,9 +9,13 @@ The racing track is described by a series of checkpoints that you have to roll t
 
 
 ## Description of the grpc interface
-The idea behind the interface is that you can retrieve a view of the world around the sphere under your control and apply a force in the x/z plane to change the movement of the sphere.
+The idea behind the interface is that you can retrieve a view of the world around the sphere under your control and apply a force in the x/z direction to change the movement of the sphere.
 The view of the world (`getState`) contains the following fields:
-* `surrounding`: a list of (`height`, `kind` (ground type)) tuples describing the 9x9m surrounding of the player with 1 sample per meter. The first entry describes the world at (player.x - 4, player.z -4), the second at (player.x - 3, player.z - 4). If `kind == -1`, the coordinate is not part of the world.
+* `surrounding`: a list of (`height`, `kind` (ground type)) tuples describing the 9x9m surrounding of the player with 1 sample per meter. If `kind == -1`, the coordinate is not part of the world. The list structure is as follows:
+  * The first element describes the world at (player.x - 4, player.z - 4)
+  * The second element describes the world at (player.x - 3, player.z - 4)
+  * ...
+  * The last element describes the world at (player.x + 4, player.z + 4)
 * `y`: the height of the player sphere center
 * `distance`: the distance in meters to the next checkpoint center. Checkpoints have a radius of 3m. 0.0 if the last checkpoint was collected.
 
@@ -41,7 +45,7 @@ docker run --rm --net host -v $(pwd)/clients:/opt/clients:Z --name racing julian
 
 The notebooks contain some scaffolding code that allows you to run the game in headless mode and step through frames and provide game input.
 We provide two setups:
-* basic: contains functions for interacting with the game, you can use the building blocks to solve the game however you want.
+* basic: contains functions for interacting with the game, you can use the building blocks to solve the game like you want.
 * pygad: contains a basic setup to train a neural network based on genetic algorithm. The example is not sufficient to play the game successfully.
 
 
