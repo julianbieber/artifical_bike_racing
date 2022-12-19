@@ -38,7 +38,8 @@ You can check out the [proto](proto/game.proto) file for the specification.
 
 
 ## Jupyter notebook
-We provide a docker image you can run to interact with the game from a jupyter notebook.
+We provide a docker image you can run to interact with the game from a jupyter notebook. You should mount the clients directory of this repository into the container.
+You can then find the notebooks under `http://127.0.0.1:8888/lab/tree/opt/clients/basic.ipynb` and `http://127.0.0.1:8888/lab/tree/opt/clients/pygad.ipynb`.
 ```
 docker run --rm --net host -v $(pwd)/clients:/opt/clients:Z --name racing julianbieber/artificial-bike-racing:latest  
 ```
