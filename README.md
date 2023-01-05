@@ -16,9 +16,9 @@ The view of the world (`getState`) contains the following fields:
   * The second element describes the world at (player.x - 31, player.z - 32)
   * ...
   * The last element describes the world at (player.x + 32, player.z + 32)
-* `x`: the height of the player sphere center
+* `x`: the x coordinate of the player sphere center
 * `y`: the height of the player sphere center
-* `z`: the height of the player sphere center
+* `z`: the z coordinate of the player sphere center
 * `distance`: the distance in meters to the next checkpoint center. Checkpoints have a radius of 3m. 0.0 if the last checkpoint was collected.
 * `finished`: indicates if the last checkpoint has been collected
 
