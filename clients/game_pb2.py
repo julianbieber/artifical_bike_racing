@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\ngame.proto\x12\x04game\"\x07\n\x05\x45mpty\"$\n\x0cInputRequest\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01z\x18\x02 \x01(\x02\"M\n\nPlayerView\x12\"\n\x0bsurrounding\x18\x01 \x03(\x0b\x32\r.game.Terrain\x12\t\n\x01y\x18\x02 \x01(\x02\x12\x10\n\x08\x64istance\x18\x03 \x01(\x02\"\'\n\x07Terrain\x12\x0e\n\x06height\x18\x01 \x01(\x02\x12\x0c\n\x04kind\x18\x02 \x01(\x05\"\'\n\x05Score\x12\x0f\n\x07timings\x18\x01 \x03(\x03\x12\r\n\x05total\x18\x02 \x01(\x05\x32\xce\x01\n\x0bMainService\x12\"\n\x06health\x12\x0b.game.Empty\x1a\x0b.game.Empty\x12)\n\x08getState\x12\x0b.game.Empty\x1a\x10.game.PlayerView\x12(\n\x05input\x12\x12.game.InputRequest\x1a\x0b.game.Empty\x12 \n\x04kill\x12\x0b.game.Empty\x1a\x0b.game.Empty\x12$\n\x08getScore\x12\x0b.game.Empty\x1a\x0b.game.Scoreb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\ngame.proto\x12\x04game\"\x07\n\x05\x45mpty\"$\n\x0cInputRequest\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01z\x18\x02 \x01(\x02\"u\n\nPlayerView\x12\"\n\x0bsurrounding\x18\x01 \x03(\x0b\x32\r.game.Terrain\x12\t\n\x01x\x18\x02 \x01(\x02\x12\t\n\x01y\x18\x03 \x01(\x02\x12\t\n\x01z\x18\x04 \x01(\x02\x12\x10\n\x08\x64istance\x18\x05 \x01(\x02\x12\x10\n\x08\x66inished\x18\x06 \x01(\x08\"\'\n\x07Terrain\x12\x0e\n\x06height\x18\x01 \x01(\x02\x12\x0c\n\x04kind\x18\x02 \x01(\x05\"\'\n\x05Score\x12\x0f\n\x07timings\x18\x01 \x03(\x03\x12\r\n\x05total\x18\x02 \x01(\x05\x32\xce\x01\n\x0bMainService\x12\"\n\x06health\x12\x0b.game.Empty\x1a\x0b.game.Empty\x12)\n\x08getState\x12\x0b.game.Empty\x1a\x10.game.PlayerView\x12(\n\x05input\x12\x12.game.InputRequest\x1a\x0b.game.Empty\x12 \n\x04kill\x12\x0b.game.Empty\x1a\x0b.game.Empty\x12$\n\x08getScore\x12\x0b.game.Empty\x1a\x0b.game.Scoreb\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'game_pb2', globals())
@@ -25,11 +25,11 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _INPUTREQUEST._serialized_start=29
   _INPUTREQUEST._serialized_end=65
   _PLAYERVIEW._serialized_start=67
-  _PLAYERVIEW._serialized_end=144
-  _TERRAIN._serialized_start=146
-  _TERRAIN._serialized_end=185
-  _SCORE._serialized_start=187
-  _SCORE._serialized_end=226
-  _MAINSERVICE._serialized_start=229
-  _MAINSERVICE._serialized_end=435
+  _PLAYERVIEW._serialized_end=184
+  _TERRAIN._serialized_start=186
+  _TERRAIN._serialized_end=225
+  _SCORE._serialized_start=227
+  _SCORE._serialized_end=266
+  _MAINSERVICE._serialized_start=269
+  _MAINSERVICE._serialized_end=475
 # @@protoc_insertion_point(module_scope)

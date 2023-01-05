@@ -11,17 +11,20 @@ The racing track is described by a series of checkpoints that you have to roll t
 ## Description of the grpc interface
 The idea behind the interface is that you can retrieve a view of the world around the sphere under your control and apply a force in the x/z direction to change the movement of the sphere.
 The view of the world (`getState`) contains the following fields:
-* `surrounding`: a list of (`height`, `kind` (ground type)) tuples describing the 9x9m surrounding of the player with 1 sample per meter. If `kind == -1`, the coordinate is not part of the world. The list structure is as follows:
-  * The first element describes the world at (player.x - 4, player.z - 4)
-  * The second element describes the world at (player.x - 3, player.z - 4)
+* `surrounding`: a list of (`height`, `kind` (ground type)) tuples describing the 65x65m surrounding of the player with 1 sample per meter. If `kind == -1`, the coordinate is not part of the world. The jupyter notebooks include a helper function for accessing the terrain at offsets from the player. The list structure is as follows:
+  * The first element describes the world at (player.x - 32, player.z - 32)
+  * The second element describes the world at (player.x - 31, player.z - 32)
   * ...
-  * The last element describes the world at (player.x + 4, player.z + 4)
+  * The last element describes the world at (player.x + 32, player.z + 32)
+* `x`: the height of the player sphere center
 * `y`: the height of the player sphere center
+* `z`: the height of the player sphere center
 * `distance`: the distance in meters to the next checkpoint center. Checkpoints have a radius of 3m. 0.0 if the last checkpoint was collected.
+* `finished`: indicates if the last checkpoint has been collected
 
-The input for controlling the sphere (`input`) contains the following fields:
-* `x`: force in x direction (in a global coordinate system, independent of the current movement direction)
-* `z`: force in z direction (in a global coordinate system, independent of the current movement direction)
+The input for controlling the sphere (`input`) contains the following fields, please note that the y velocity of the player is under control of the physics simulation:
+* `x`: velocity in x direction (in a global coordinate system, independent of the current movement direction)
+* `z`: velocity in z direction (in a global coordinate system, independent of the current movement direction)
 
 The methods `getState` and `input` need to be called in order to step one frame further.
 One frame equals 16ms of simulation.

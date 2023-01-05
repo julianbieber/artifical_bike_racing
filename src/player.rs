@@ -64,7 +64,7 @@ impl Plugin for PlayerPlugin {
         .add_system(player_light_system);
         if self.grpc {
             app.add_system(player_input_grpc)
-                .add_system(send_player_view_grpc);
+                .add_system(send_player_view_grpc.before(player_input_grpc));
         } else if self.recording_paths.is_empty() {
             app.add_system(player_debug_inputs);
         } else {
@@ -149,6 +149,10 @@ fn spawn_player(
             force: Vec3::ZERO,
             torque: Vec3::ZERO,
         })
+        .insert(Velocity {
+            linvel: Vec3::ZERO,
+            angvel: Vec3::ZERO,
+        })
         .insert(PlayerMarker {
             playback_recording: player_info.0,
             playback_position: 0,
@@ -216,12 +220,18 @@ fn player_debug_inputs(
 fn player_input_grpc(
     runtime: Res<RuntimeResoure>,
     mut next_frame_receiver: ResMut<NextFrameResource>,
-    mut player_query: Query<&mut ExternalForce, With<PlayerMarker>>,
+    mut player_query: Query<&mut Velocity, With<PlayerMarker>>,
 ) {
     runtime.0.block_on(async {
         let force = next_frame_receiver.0.recv().await.unwrap();
-        for mut impulse in player_query.iter_mut() {
-            impulse.force = Vec3::new(force.x, 0.0, force.z);
+        if force.x != 0.0 || force.z != 0.0 {
+            for mut impulse in player_query.iter_mut() {
+                impulse.linvel = Vec3::new(
+                    force.x.clamp(-15.0, 15.0),
+                    impulse.linvel.y,
+                    force.z.clamp(-15.0, 15.0),
+                );
+            }
         }
     });
 }
@@ -241,23 +251,27 @@ fn send_player_view_grpc(
     runtime: Res<RuntimeResoure>,
     state_sender: Res<FrameStateSenderResource>,
     terrain: Res<Terrain>,
-    player_query: Query<(Entity, &Transform), With<PlayerMarker>>,
+    player_query: Query<(Entity, &Transform, &Velocity), With<PlayerMarker>>,
     history: Res<HistoryResource>,
     checkpoints: Query<(&Checkpoint, &Transform)>,
 ) {
     let history = history.0.lock().unwrap();
-    let next_state = if let Some((player, player_position)) = player_query.iter().next() {
+    let next_state = if let Some((player, player_position, velocity)) = player_query.iter().next() {
         let history = history.get(&player).unwrap();
         let next_checkpoint_index = history
             .collected_checkpoints
             .last()
-            .map(|c| c.0)
+            .map(|c| c.0 + 1)
             .unwrap_or(0);
         let distance_to_next_checkpint = checkpoints
             .iter()
             .find(|c| c.0.number == next_checkpoint_index)
             .map(|c| c.1.translation.distance(player_position.translation))
             .unwrap_or(0.0);
+        let next_checkpint = checkpoints
+            .iter()
+            .find(|c| c.0.number == next_checkpoint_index)
+            .map(|c| c.1.translation);
 
         let surrounding = terrain
             .get_heights_around(player_position.translation.x, player_position.translation.z)
@@ -269,6 +283,9 @@ fn send_player_view_grpc(
             surrounding,
             player: player_position.translation,
             distance: distance_to_next_checkpint,
+            checkpoint: next_checkpint.unwrap_or(Vec3::ZERO),
+            velocity: velocity.linvel,
+            finished: next_checkpint.is_none(),
         })
     } else {
         None

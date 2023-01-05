@@ -95,7 +95,7 @@ impl Terrain {
     }
 
     pub fn get_heights_around(&self, x: f32, z: f32) -> Vec<Option<Quad>> {
-        let size = 4;
+        let size = 32;
         if let Some(indices) = self.world_to_index(x, z) {
             self.surrounding(indices.0, indices.1, size)
                 .into_iter()

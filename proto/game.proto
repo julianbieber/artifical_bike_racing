@@ -19,9 +19,12 @@ message InputRequest {
 
 message PlayerView {
   repeated Terrain surrounding = 1;
-  float y = 2;
-  float distance = 3;
-  
+  float x = 2;
+  float y = 3;
+  float z = 4;
+  float distance = 5;
+
+  bool finished = 6;
 }
 
 message Terrain {

@@ -29,6 +29,9 @@ pub struct FrameState {
     pub surrounding: Vec<Option<(TextureSections, f32)>>,
     pub player: Vec3,
     pub distance: f32,
+    pub checkpoint: Vec3,
+    pub velocity: Vec3,
+    pub finished: bool,
 }
 #[derive(Debug)]
 pub struct NextFrame {
@@ -104,8 +107,11 @@ impl MainService for GameServer {
                         })
                     })
                     .collect(),
+                x: state.player.x,
                 y: state.player.y,
+                z: state.player.z,
                 distance: state.distance,
+                finished: state.finished,
             }))
         } else {
             Err(Status::not_found("no new game state available"))
