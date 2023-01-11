@@ -45,6 +45,7 @@ impl Plugin for WorldPlugin {
 fn setup_world(
     mut commands: Commands,
     history: Res<HistoryResource>,
+    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
@@ -57,16 +58,17 @@ fn setup_world(
     let checkpoints = build_checkpoints(&mut materials, &mut terrain, seed.value);
     let players = setup_player(
         &mut commands,
+        &asset_server,
         &mut meshes,
         &mut materials,
         &player_recordings.paths,
-        &player_recordings.colors,
+        &player_recordings.materials,
         (checkpoints[0].0, 2.0),
     );
     let checkpoint_mesh = meshes.add(
         Icosphere {
             radius: 3.0,
-            subdivisions: 8,
+            subdivisions: 4,
         }
         .into(),
     );

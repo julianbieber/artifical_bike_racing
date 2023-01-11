@@ -18,7 +18,7 @@ use crate::{
 pub struct PlayerPlugin {
     pub grpc: bool,
     pub recording_paths: Vec<PathBuf>,
-    pub colors: Vec<Color>,
+    pub materials: Vec<PathBuf>,
 }
 
 #[derive(Serialize, Deserialize, Resource)]
@@ -45,7 +45,7 @@ impl From<&Transform> for SerializableTransform {
 #[derive(Resource)]
 pub struct PlayerSetupResource {
     pub paths: Vec<PathBuf>,
-    pub colors: Vec<Color>,
+    pub materials: Vec<PathBuf>,
 }
 
 impl Plugin for PlayerPlugin {
@@ -55,7 +55,7 @@ impl Plugin for PlayerPlugin {
         })
         .insert_resource(PlayerSetupResource {
             paths: self.recording_paths.clone(),
-            colors: self.colors.clone(),
+            materials: self.materials.clone(),
         })
         .add_system(kill_system)
         .add_system(record_player_positions)
@@ -75,10 +75,11 @@ impl Plugin for PlayerPlugin {
 
 pub fn setup_player(
     commands: &mut Commands,
+    asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     paths: &[PathBuf],
-    colors: &[Color],
+    player_materials: &[PathBuf],
     start_block: (Vec3, f32),
 ) -> Vec<Entity> {
     let recordings = read_recordings(paths);
@@ -88,24 +89,55 @@ pub fn setup_player(
             meshes,
             materials,
             start_block,
-            (Vec::new(), Color::BLACK),
+            (
+                Vec::new(),
+                StandardMaterial {
+                    base_color: Color::ANTIQUE_WHITE,
+                    ..Default::default()
+                },
+            ),
             0,
             "self".into(),
         )]
     } else {
+        let player_materials = if player_materials.len() < recordings.len() {
+            let mut m = player_materials
+                .iter()
+                .map(|p| StandardMaterial {
+                    base_color_texture: Some(asset_server.load(p.as_path())),
+                    ..Default::default()
+                })
+                .collect::<Vec<_>>();
+
+            for _ in 0..(recordings.len() - player_materials.len()) {
+                m.push(StandardMaterial {
+                    base_color: Color::WHITE,
+                    ..Default::default()
+                });
+            }
+            m
+        } else {
+            player_materials
+                .iter()
+                .map(|p| StandardMaterial {
+                    base_color_texture: Some(asset_server.load(p.as_path())),
+                    ..Default::default()
+                })
+                .collect::<Vec<_>>()
+        };
         recordings
             .into_iter()
-            .zip(colors.iter())
+            .zip(player_materials.into_iter())
             .enumerate()
-            .map(|(i, r)| {
+            .map(|(i, ((player_name, transforms), player_material))| {
                 spawn_player(
                     commands,
                     meshes,
                     materials,
                     start_block,
-                    (r.0 .1.transforms, *r.1),
+                    (transforms.transforms, player_material),
                     i,
-                    r.0 .0,
+                    player_name,
                 )
             })
             .collect()
@@ -117,7 +149,7 @@ fn spawn_player(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     start_block_transform: (Vec3, f32),
-    player_info: (Vec<SerializableTransform>, Color),
+    player_info: (Vec<SerializableTransform>, StandardMaterial),
     index: usize,
     name: String,
 ) -> Entity {
@@ -127,14 +159,11 @@ fn spawn_player(
         mesh: meshes.add(
             Icosphere {
                 radius: 0.5,
-                subdivisions: 5,
+                subdivisions: 3,
             }
             .into(),
         ),
-        material: materials.add(StandardMaterial {
-            base_color: player_info.1,
-            ..Default::default()
-        }),
+        material: materials.add(player_info.1),
         transform: Transform::from_translation(
             start_block_transform.0 + Vec3::Y * start_block_transform.1,
         ),

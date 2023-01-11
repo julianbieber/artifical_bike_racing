@@ -38,9 +38,6 @@ struct Opt {
     /// port used to start the grpc server
     #[arg(long)]
     port: i32,
-    /// if passed, the game does not wait for grpc input. The simulation runs continously.
-    #[arg(long)]
-    continuous: bool,
     /// if passed, the game will not be rendered.
     #[arg(long)]
     headless: bool,
@@ -52,8 +49,8 @@ struct Opt {
     /// The recording will be replayed without additional physics simulation.
     recording: Vec<PathBuf>,
     #[arg(long)]
-    /// color for the recorded sphere. This parameter must be passed the same number of times as recording.
-    color: Vec<PlayerColor>,
+    /// image for the recorded sphere; either 8 big png or jpg; the path should be relative to assets
+    player_image: Vec<PathBuf>,
     #[arg(long)]
     /// Path under which to save a recoding.
     save: Option<PathBuf>,
@@ -87,9 +84,6 @@ pub struct SavePathReource(pub Option<PathBuf>);
 
 fn main() {
     let opt = dbg!(Opt::parse());
-    if opt.color.len() != opt.recording.len() {
-        panic!("color and recording must have the same length");
-    }
     let runtime = Runtime::new().unwrap();
     let (frame_sender, frame_reciever) = tokio::sync::mpsc::channel(1);
     let (next_sender, next_reciever) = tokio::sync::mpsc::channel(1);
@@ -136,16 +130,16 @@ fn main() {
         .add_asset::<StandardMaterial>();
     } else {
         a.add_plugins(DefaultPlugins).add_plugin(CameraPlugin {
-            active: opt.continuous,
+            active: !opt.headless,
         });
     }
     a.add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_startup_system(configure_physics)
         .add_plugin(WorldPlugin { seed: opt.seed })
         .add_plugin(PlayerPlugin {
-            grpc: !opt.continuous,
+            grpc: opt.headless,
             recording_paths: opt.recording,
-            colors: opt.color.into_iter().map(|v| v.into()).collect(),
+            materials: opt.player_image.into_iter().map(|v| v.into()).collect(),
         })
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(LogDiagnosticsPlugin {
@@ -154,20 +148,6 @@ fn main() {
 
     a.run();
     t.join().unwrap();
-}
-
-impl From<PlayerColor> for Color {
-    fn from(c: PlayerColor) -> Self {
-        match c {
-            PlayerColor::Red => Color::RED,
-            PlayerColor::Green => Color::GREEN,
-            PlayerColor::Black => Color::BLACK,
-            PlayerColor::White => Color::WHITE,
-            PlayerColor::Yellow => Color::YELLOW,
-            PlayerColor::Blue => Color::BLUE,
-            PlayerColor::Grey => Color::GRAY,
-        }
-    }
 }
 
 fn configure_physics(mut config: ResMut<RapierConfiguration>) {

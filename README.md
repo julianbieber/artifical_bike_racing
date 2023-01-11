@@ -59,17 +59,22 @@ We provide two setups:
 Usage: artificial_bike_racing [OPTIONS] --port <PORT> --seed <SEED>
 
 Options:
-      --port <PORT>            port used to start the grpc server
-      --continuous             if passed, the game does not wait for grpc input. The simulation runs continously
-      --headless               if passed, the game will not be rendered
-      --seed <SEED>            The seed for world and track generation
-      --recording <RECORDING>  path to a previously recorded race. The file contains one player transformation (position + rotation) per frame of the previous run. The recording will be replayed without additional physics simulation
-      --color <COLOR>          color for the recorded sphere. This parameter must be passed the same number of times as recording [possible values: red, green, black, white, yellow, blue, grey]
-      --save <SAVE>            Path under which to save a recoding
-  -h, --help                   Print help information  
-```
+      --port <PORT>
+          port used to start the grpc server
+      --headless
+          if passed, the game will not be rendered
+      --seed <SEED>
+          The seed for world and track generation
+      --recording <RECORDING>
+          path to a previously recorded race. The file contains one player transformation (position + rotation) per frame of the previous run. The recording will be replayed without additional physics simulation
+      --player-image <PLAYER_IMAGE>
+          image for the recorded sphere; either 8 big png or jpg; the path should be relative to assets
+      --save <SAVE>
+          Path under which to save a recoding
+  -h, --help
+          Print help information```
 
 When you want to run the game headfull for example to view a recording, you need to compile+run it with [cargo](https://rustup.rs/).
 ```
-cargo run --release -- --port 50051 --cont  --seed 2 --recording clients/50059.json --color black
+cargo run --release -- --port 50051 --seed 2 --recording clients/50059.json 
 ```

@@ -53,7 +53,7 @@ pub fn start_server(
                 .send(NextFrame { x: 0.0, z: 0.0 })
                 .await
                 .unwrap();
-            let addr = format!("[::1]:{port}").parse().unwrap();
+            let addr = format!("127.0.0.1:{port}").parse().unwrap();
             let game_server = GameServer {
                 frame_receiver: Mutex::new(frame_receiver),
                 next_frame_sender,
