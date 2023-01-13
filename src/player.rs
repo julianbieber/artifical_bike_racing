@@ -57,6 +57,7 @@ impl Plugin for PlayerPlugin {
             paths: self.recording_paths.clone(),
             materials: self.materials.clone(),
         })
+        .add_startup_system(setup_ui)
         .add_system(kill_system)
         .add_system(record_player_positions)
         .add_system(sync_palyer_lights)
@@ -71,6 +72,34 @@ impl Plugin for PlayerPlugin {
             app.add_system(movement_playback);
         }
     }
+}
+#[derive(Component)]
+pub struct CurrentPlayerText {}
+fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn((
+        // Create a TextBundle that has a Text with a single section.
+        TextBundle::from_section(
+            // Accepts a `String` or any type that converts into a `String`, such as `&str`
+            "PlayerName",
+            TextStyle {
+                font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                font_size: 100.0,
+                color: Color::WHITE,
+            },
+        ) // Set the alignment of the Text
+        .with_text_alignment(TextAlignment::TOP_CENTER)
+        // Set the style of the TextBundle itself.
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            position: UiRect {
+                bottom: Val::Px(5.0),
+                right: Val::Px(15.0),
+                ..default()
+            },
+            ..default()
+        }),
+        CurrentPlayerText {},
+    ));
 }
 
 pub fn setup_player(
@@ -238,13 +267,15 @@ fn player_debug_inputs(
     mut player_query: Query<&mut Velocity, With<PlayerMarker>>,
 ) {
     for mut impulse in player_query.iter_mut() {
-        let x = 10.0 * keys.pressed(KeyCode::W) as i32 as f32
-            + -10.0 * keys.pressed(KeyCode::S) as i32 as f32;
-        let z = 10.0 * keys.pressed(KeyCode::A) as i32 as f32
-            + -10.0 * keys.pressed(KeyCode::D) as i32 as f32;
+        let x = 10.0 * keys.pressed(KeyCode::D) as i32 as f32
+            + -10.0 * keys.pressed(KeyCode::A) as i32 as f32;
+        let z = 10.0 * keys.pressed(KeyCode::S) as i32 as f32
+            + -10.0 * keys.pressed(KeyCode::W) as i32 as f32;
+
+        let y = 10.0 * keys.pressed(KeyCode::Space) as i32 as f32;
         impulse.linvel = Vec3::new(
             if x == 0.0 { impulse.linvel.x } else { x },
-            impulse.linvel.y,
+            if y == 0.0 { impulse.linvel.y } else { y },
             if z == 0.0 { impulse.linvel.z } else { z },
         );
     }
@@ -391,7 +422,11 @@ fn movement_playback(mut players_q: Query<(&mut Transform, &mut PlayerMarker)>) 
     }
 }
 
-fn swap_camera(keys: Res<Input<KeyCode>>, mut players: Query<(&mut FollowCamera, &PlayerMarker)>) {
+fn swap_camera(
+    keys: Res<Input<KeyCode>>,
+    mut players: Query<(&mut FollowCamera, &PlayerMarker)>,
+    mut current_player_text_q: Query<&mut Text, With<CurrentPlayerText>>,
+) {
     if keys.just_pressed(KeyCode::Right) {
         let player_count = players.iter().count();
         if let Some(current_follow) = players.iter().find(|p| p.0.follows) {
@@ -408,6 +443,11 @@ fn swap_camera(keys: Res<Input<KeyCode>>, mut players: Query<(&mut FollowCamera,
             players
                 .iter_mut()
                 .for_each(|mut p| p.0.follows = p.1.index == next);
+        }
+    }
+    if let Some(player_name) = players.iter().find(|p| p.0.follows) {
+        for mut t in current_player_text_q.iter_mut() {
+            t.sections[0].value = player_name.1.name.clone();
         }
     }
 }
