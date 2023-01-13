@@ -62,7 +62,7 @@ impl Plugin for PlayerPlugin {
         .add_system(sync_palyer_lights)
         .add_system(swap_camera)
         .add_system(player_light_system);
-        if self.grpc {
+        if self.grpc && self.recording_paths.is_empty() {
             app.add_system(player_input_grpc)
                 .add_system(send_player_view_grpc.before(player_input_grpc));
         } else if self.recording_paths.is_empty() {
@@ -193,7 +193,7 @@ fn spawn_player(
         player_entity
             .insert(RigidBody::Dynamic)
             .insert(Collider::ball(0.5))
-            .insert(Restitution::coefficient(0.7))
+            .insert(Restitution::coefficient(1.0))
             .insert(ActiveEvents::COLLISION_EVENTS)
             .id()
     } else {
@@ -235,14 +235,18 @@ struct PlayerLight {
 }
 fn player_debug_inputs(
     keys: Res<Input<KeyCode>>,
-    mut player_query: Query<&mut ExternalForce, With<PlayerMarker>>,
+    mut player_query: Query<&mut Velocity, With<PlayerMarker>>,
 ) {
     for mut impulse in player_query.iter_mut() {
-        impulse.force = Vec3::Y * 10.0 * keys.pressed(KeyCode::Space) as i32 as f32
-            + Vec3::Z * 10.0 * keys.pressed(KeyCode::W) as i32 as f32
-            + Vec3::Z * -10.0 * keys.pressed(KeyCode::S) as i32 as f32
-            + Vec3::X * 10.0 * keys.pressed(KeyCode::A) as i32 as f32
-            + Vec3::X * -10.0 * keys.pressed(KeyCode::D) as i32 as f32;
+        let x = 10.0 * keys.pressed(KeyCode::W) as i32 as f32
+            + -10.0 * keys.pressed(KeyCode::S) as i32 as f32;
+        let z = 10.0 * keys.pressed(KeyCode::A) as i32 as f32
+            + -10.0 * keys.pressed(KeyCode::D) as i32 as f32;
+        impulse.linvel = Vec3::new(
+            if x == 0.0 { impulse.linvel.x } else { x },
+            impulse.linvel.y,
+            if z == 0.0 { impulse.linvel.z } else { z },
+        );
     }
 }
 
@@ -256,9 +260,9 @@ fn player_input_grpc(
         if force.x != 0.0 || force.z != 0.0 {
             for mut impulse in player_query.iter_mut() {
                 impulse.linvel = Vec3::new(
-                    force.x.clamp(-15.0, 15.0),
+                    force.x.clamp(-10.0, 10.0),
                     impulse.linvel.y,
-                    force.z.clamp(-15.0, 15.0),
+                    force.z.clamp(-10.0, 10.0),
                 );
             }
         }

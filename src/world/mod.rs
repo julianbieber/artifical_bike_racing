@@ -85,12 +85,12 @@ fn setup_world(
             )
         })
         .collect();
-    for (trnaslation, mut checkpoint) in checkpoints {
+    for (translation, mut checkpoint) in checkpoints {
         checkpoint.remaining_players = players.clone();
         checkpoint.total_player_count = players.len();
         spawn_checkpoint(
             &mut commands,
-            trnaslation,
+            translation,
             checkpoint,
             checkpoint_mesh.clone(),
         );
