@@ -272,11 +272,12 @@ fn player_debug_inputs(
         let z = 10.0 * keys.pressed(KeyCode::S) as i32 as f32
             + -10.0 * keys.pressed(KeyCode::W) as i32 as f32;
 
-        let y = 10.0 * keys.pressed(KeyCode::Space) as i32 as f32;
+        let y = 10.0 * keys.pressed(KeyCode::Space) as i32 as f32
+            + -10.0 * keys.pressed(KeyCode::E) as i32 as f32;
         impulse.linvel = Vec3::new(
-            if x == 0.0 { impulse.linvel.x } else { x },
-            if y == 0.0 { impulse.linvel.y } else { y },
-            if z == 0.0 { impulse.linvel.z } else { z },
+            if x == 0.0 { x } else { x },
+            if y == 0.0 { y } else { y },
+            if z == 0.0 { z } else { z },
         );
     }
 }

@@ -27,6 +27,8 @@ use tokio::{
 };
 use world::{checkpoint::History, WorldPlugin};
 
+use crate::world::load_texture::TextureSections;
+
 mod camera;
 mod player;
 mod server;
@@ -83,6 +85,7 @@ pub struct ShutdownResource(pub Receiver<()>);
 pub struct SavePathReource(pub Option<PathBuf>);
 
 fn main() {
+    dbg!(TextureSections::Grass as i32);
     let opt = dbg!(Opt::parse());
     let runtime = Runtime::new().unwrap();
     let (frame_sender, frame_reciever) = tokio::sync::mpsc::channel(1);
